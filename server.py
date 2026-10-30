@@ -133,6 +133,90 @@ def normalize_quote(row, market):
     }
 
 
+
+# OpenAPI may continue to serve the previous trading day's snapshot after close.
+# Official RWD day-specific endpoints are a backup, NEVER a fabricated quote.
+def clean_official_cell(value):
+    return re.sub(r'<[^>]+>', '', str(value or '')).replace('&nbsp;', ' ').strip()
+
+
+def twse_rwd_for_day(iso_day):
+    compact = iso_day.replace('-', '')
+    url = 'https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?' + urlencode({
+        'date': compact, 'type': 'ALLBUT0999', 'response': 'json'})
+    payload = fetch_json(url, timeout=13)
+    if not isinstance(payload, dict) or str(payload.get('stat','')).upper() != 'OK':
+        raise DataError('TWSE 當日逐檔行情尚未公布', 503)
+    raw_date = str(payload.get('date') or '')
+    if raw_date and raw_date[:8].isdigit() and raw_date[:8] != compact:
+        raise DataError('TWSE 指定日期回應不一致', 503)
+    tables = payload.get('tables') or []
+    if not tables and payload.get('data'):
+        tables=[payload]
+    stocks = {}
+    for table in tables:
+        fields = [clean_official_cell(x).replace(' ','') for x in table.get('fields', [])]
+        def col(*opts):
+            for candidate in opts:
+                for index, key in enumerate(fields):
+                    if key == candidate:
+                        return index
+            return None
+        code_at, name_at, close_at = col('證券代號'), col('證券名稱'), col('收盤價')
+        if code_at is None or name_at is None or close_at is None:
+            continue
+        open_at, hi_at, lo_at = col('開盤價'), col('最高價'), col('最低價')
+        volume_at = col('成交股數')
+        change_at, sign_at = col('漲跌價差'), col('漲跌(+/-)', '漲跌符號')
+        for record in table.get('data', []):
+            if not isinstance(record, list) or max(code_at,name_at,close_at) >= len(record):
+                continue
+            code=clean_official_cell(record[code_at])
+            if not symbol_ok(code): continue
+            name=clean_official_cell(record[name_at])
+            price=num(record[close_at])
+            if not name or price is None or price <= 0: continue
+            def get(at): return record[at] if at is not None and at<len(record) else None
+            delta=num(clean_official_cell(get(change_at)))
+            sign=clean_official_cell(get(sign_at))
+            if delta is not None:
+                if '-' in sign or '－' in sign: delta=-abs(delta)
+                elif '+' in sign or '＋' in sign: delta=abs(delta)
+                elif sign not in ('','X','x',''): delta=None
+            stocks[code]={
+                'code':code,'name':name,'market':'上市',
+                'type':'ETF' if code.startswith('00') else '股票',
+                'price':price,'change':delta,'open':num(get(open_at)),
+                'high':num(get(hi_at)),'low':num(get(lo_at)),
+                'volume':num(get(volume_at)), 'date':iso_day,
+                'source':'TWSE 官網指定交易日盤後',
+                'quality':'official_daily_close'}
+    if len(stocks)<100:
+        raise DataError('TWSE 當日行情表尚未提供足夠有效資料',503)
+    return stocks
+
+
+def tpex_alternate_closes():
+    # TPEx has two official daily quote endpoints. Compare row dates, not retrieval times.
+    url='https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes'
+    data=fetch_json(url,timeout=13)
+    if not isinstance(data,list):
+        raise DataError('TPEx 備用每日行情格式不符',502)
+    result={}
+    for row in data:
+        if isinstance(row,dict):
+            normalized=normalize_quote(row,'上櫃')
+            if normalized and normalized.get('date'):
+                result[normalized['code']]=normalized
+    if not result: raise DataError('TPEx 備用資料沒有有效日期',502)
+    return result
+
+
+def expected_exchange_session_day():
+    now=datetime.now(timezone(timedelta(hours=8)))
+    # Weekday + after ~15:30 is only an availability hint (holidays may differ).
+    return now.date().isoformat() if now.weekday()<5 and (now.hour>15 or (now.hour==15 and now.minute>=30)) else None
+
 def universe():
     def loader():
         stocks = {}
@@ -148,6 +232,29 @@ def universe():
                     if s: stocks[s['code']] = s
             except Exception as e:
                 errors.append(f'{market}：{str(e)[:140]}')
+        # Merge only NEWER, confirmed official closing dates, never older or guessed values.
+        expected=expected_exchange_session_day()
+        if expected:
+            listed_max=max((v['date'] for v in stocks.values() if v['market']=='上市' and v.get('date')),default='')
+            if listed_max < expected:
+                try:
+                    daily=cached(('twse-rwd',expected), 240, lambda:twse_rwd_for_day(expected))
+                    for code,row in daily.items():
+                        old=stocks.get(code)
+                        if not old or (row['date'] > (old.get('date') or '')):
+                            stocks[code]=row
+                except Exception as e:
+                    errors.append('上市當日補取：'+str(e)[:130])
+            otc_max=max((v['date'] for v in stocks.values() if v['market']=='上櫃' and v.get('date')),default='')
+            if otc_max < expected:
+                try:
+                    daily=cached(('tpex-alt',expected), 240, tpex_alternate_closes)
+                    for code,row in daily.items():
+                        old=stocks.get(code)
+                        if not old or (row.get('date') or '') > (old.get('date') or ''):
+                            stocks[code]=row
+                except Exception as e:
+                    errors.append('上櫃當日補取：'+str(e)[:130])
         # Merge master company lists. Companies without trades still appear in search, with price=null.
         for market, url in REGISTRIES.items():
             try:
@@ -165,13 +272,43 @@ def universe():
                 errors.append(f'{market}公司名冊：{str(e)[:130]}')
         if not stocks:
             raise DataError('上市、上櫃資料皆無法取得：' + ' / '.join(errors), 503)
+        dates={market:max((s['date'] for s in stocks.values() if s['market']==market and s.get('date')),default=None)
+               for market in ('上市','上櫃')}
+        fresh_hint=expected_exchange_session_day()
+        is_lagging=bool(fresh_hint and any(d and d<fresh_hint for d in dates.values()))
         return {'stocks': sorted(stocks.values(), key=lambda x: x['code']), 'total': len(stocks),
-                'errors': errors, 'updatedAt': datetime.now().astimezone().isoformat(timespec='seconds')}
+                'errors': errors, 'marketDates':dates, 'expectedSessionDate':fresh_hint,
+                'isLagging':is_lagging, 'updatedAt':datetime.now(timezone(timedelta(hours=8))).isoformat(timespec='seconds')}
     return cached('universe', 600, loader)
 
 
 # These official OpenAPI resources are daily closing snapshots, NOT live index or P/E.
 # A missing source is intentionally null instead of a fabricated dashboard value.
+def twse_recent_index_from_rwd(iso_day):
+    compact=iso_day.replace('-','')
+    url='https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK?'+urlencode({'date':compact,'response':'json'})
+    data=fetch_json(url,timeout=13)
+    if not isinstance(data,dict) or str(data.get('stat','')).upper()!='OK':
+        raise DataError('TWSE 指數指定交易日盤後尚未公布',503)
+    fields=[clean_official_cell(field) for field in data.get('fields',[])]
+    def col(term):
+        return next((i for i,name in enumerate(fields) if term in name),None)
+    date_i, index_i, change_i,turn_i=col('日期'),col('發行量加權股價指數'),col('漲跌點數'),col('成交金額')
+    if index_i is None or date_i is None: raise DataError('TWSE 指數欄位格式變更',502)
+    rows=[]
+    for row in data.get('data',[]):
+        if not isinstance(row,list) or max(date_i,index_i)>=len(row):continue
+        day=iso_date(row[date_i]);value=num(row[index_i])
+        if day and value and day<=iso_day:
+            delta=num(row[change_i]) if change_i is not None and change_i<len(row) else None
+            turn=num(row[turn_i]) if turn_i is not None and turn_i<len(row) else None
+            rows.append({'level':value,'change':delta,
+                'pct':(delta/(value-delta)*100) if delta is not None and value-delta>0 else None,
+                'date':day,'turnoverHundredMillion':round(turn/1e8,2) if turn is not None else None,
+                'source':'TWSE FMTQIK 指定交易日盤後','quality':'official_daily_close'})
+    if not rows: raise DataError('TWSE FMTQIK 沒有有效交易日行情',503)
+    return sorted(rows,key=lambda row:row['date'])[-1]
+
 def market_summary():
     def loader():
         result = {'index': None, 'turnoverHundredMillion': None,
@@ -231,6 +368,18 @@ def market_summary():
                 result['valuation'][code] = {'pe': val, 'date': iso_date(row.get('Date')),
                                               'source': 'TWSE 官方本益比（日資料）'}
         if result['valuation']: result['sources'].append('TWSE BWIBBU_ALL')
+        today=expected_exchange_session_day()
+        if today and (not result['index'] or (result['index'].get('date') or '') < today):
+            try:
+                fresh=cached(('twse-index-rwd',today),240,lambda:twse_recent_index_from_rwd(today))
+                if not result['index'] or fresh['date'] > (result['index'].get('date') or ''):
+                    result['index']={k:v for k,v in fresh.items() if k != 'turnoverHundredMillion'}
+                    if fresh['turnoverHundredMillion'] is not None:
+                        result['turnoverHundredMillion']=fresh['turnoverHundredMillion']
+                        result['turnoverDate']=fresh['date']
+                    result['sources'].append('TWSE FMTQIK 指定日補取')
+            except Exception as e:
+                result['errors'].append('加權指數當日補取：'+str(e)[:110])
         return result
     return cached('market-summary', 900, loader)
 
@@ -487,10 +636,35 @@ class Handler(SimpleHTTPRequestHandler):
             try: return self.json_reply(200, market_summary())
             except DataError as error: return self.json_reply(error.status, {'error': str(error)})
             except Exception: return self.json_reply(502, {'error': '大盤統計資料暫不可用'})
+        if parsed.path == '/api/diagnostics':
+            # Public diagnostic endpoint: date/provenance only, never credentials.
+            try:
+                market=universe()
+                index=market_summary().get('index') or {}
+                watches={code:{'date':row.get('date'),'price':row.get('price'),'source':row.get('source')}
+                         for row in market['stocks'] for code in ('2330','2308') if row['code']==code}
+                return self.json_reply(200, {
+                    'marketDates':market['marketDates'],
+                    'expectedSessionDate':market.get('expectedSessionDate'),
+                    'isLagging':market.get('isLagging'),
+                    'index':{'date':index.get('date'),'level':index.get('level'),'source':index.get('source')},
+                    'focusStocks':watches,'errors':market.get('errors',[]),
+                    'checkedAt':datetime.now(timezone(timedelta(hours=8))).isoformat(timespec='seconds')})
+            except DataError as exc:
+                return self.json_reply(exc.status, {'error':str(exc)})
+            except Exception:
+                return self.json_reply(502, {'error':'行情來源驗證暫不可用'})
         if parsed.path == '/api/health':
             return self.json_reply(200, {'ok':True, 'backend':'TWSE Pro', 'time':datetime.now().isoformat(timespec='seconds')})
         if parsed.path == '/api/stocks':
-            try: return self.json_reply(200, universe())
+            try:
+                if (parse_qs(parsed.query).get('refresh') == ['1']):
+                    # Prevent simultaneous visitors from triggering expensive upstream refreshes.
+                    with LOCK:
+                        old=CACHE.get('universe')
+                        if old and time.time()-old[0]>75:
+                            CACHE.pop('universe',None)
+                return self.json_reply(200, universe())
             except DataError as e: return self.json_reply(e.status, {'error':str(e)})
             except Exception as e: return self.json_reply(502, {'error':str(e)})
         if parsed.path == '/api/candles':
