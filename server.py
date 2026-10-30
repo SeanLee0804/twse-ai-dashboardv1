@@ -113,15 +113,15 @@ def normalize_quote(row, market):
     close = num(row.get('ClosingPrice') if market == '上市' else row.get('Close'))
     change = num(row.get('Change'))
     if market == '上市' and change is not None:
-        # TWSE carries separate +/- sign column in some endpoints. Never infer if absent.
+        # TWSE daily Change is signed. Some alternative schemas also supply ChangeSign.
+        # Never turn a valid signed Change into missing data merely because Sign is absent.
         sign = str(row.get('ChangeSign') or row.get('Sign') or '')
         if '－' in sign or '-' in sign: change = -abs(change)
         elif '＋' in sign or '+' in sign: change = abs(change)
-        else: change = None
     day = iso_date(row.get('Date'))
     return {
         'code': code, 'name': name, 'market': market,
-        'type': 'ETF' if code.startswith('00') and len(code) >= 5 else '股票',
+        'type': 'ETF' if code.startswith('00') else '股票',
         'price': close,
         'change': change,
         'open': num(row.get('OpeningPrice') if market == '上市' else row.get('Open')),
@@ -168,6 +168,71 @@ def universe():
         return {'stocks': sorted(stocks.values(), key=lambda x: x['code']), 'total': len(stocks),
                 'errors': errors, 'updatedAt': datetime.now().astimezone().isoformat(timespec='seconds')}
     return cached('universe', 600, loader)
+
+
+# These official OpenAPI resources are daily closing snapshots, NOT live index or P/E.
+# A missing source is intentionally null instead of a fabricated dashboard value.
+def market_summary():
+    def loader():
+        result = {'index': None, 'turnoverHundredMillion': None,
+                  'valuation': {}, 'sources': [], 'errors': []}
+        urls = {
+            'index': 'https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX',
+            'turnover': 'https://openapi.twse.com.tw/v1/exchangeReport/FMTQIK',
+            'pe': 'https://openapi.twse.com.tw/v1/exchangeReport/BWIBBU_ALL',
+        }
+        responses = {}
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            jobs = {pool.submit(fetch_json, url, timeout=12): key for key,url in urls.items()}
+            for task in as_completed(jobs):
+                key = jobs[task]
+                try:
+                    data = task.result()
+                    if not isinstance(data, list): raise ValueError('不是陣列格式')
+                    responses[key] = data
+                except Exception as error:
+                    result['errors'].append(key + '：' + str(error)[:100])
+        for row in responses.get('index', []):
+            if not isinstance(row, dict): continue
+            name = str(row.get('指數') or row.get('指數/報酬指數') or '').strip()
+            if name not in ('發行量加權股價指數', '發行量加權股價指數(臺灣加權指數)'): continue
+            level = num(row.get('收盤指數'))
+            if level is None or level <= 0: continue
+            move = num(row.get('漲跌點數'))
+            sign = str(row.get('漲跌') or row.get('漲跌(+/-)') or '').strip()
+            if move is not None:
+                if '-' in sign or '－' in sign or '跌' in sign: move=-abs(move)
+                elif '+' in sign or '＋' in sign or '漲' in sign: move=abs(move)
+                elif not (str(row.get('漲跌點數')).strip().startswith(('+','-','－','＋'))): move=None
+            day = iso_date(row.get('日期'))
+            result['index'] = {
+                'level': level, 'change': move,
+                'pct': (move / (level - move) * 100) if move is not None and level-move>0 else None,
+                'date': day, 'source': 'TWSE 官方加權指數盤後資料', 'quality': 'official_daily_close'
+            }
+            result['sources'].append('TWSE MI_INDEX')
+            break
+        turnovers = [row for row in responses.get('turnover', []) if isinstance(row, dict)]
+        for row in reversed(turnovers):
+            day=iso_date(row.get('Date'))
+            if result['index'] and day != result['index']['date']: continue
+            value=num(row.get('TradeValue'))
+            if value is not None and value>=0:
+                result['turnoverHundredMillion'] = round(value/100_000_000,2)
+                result['turnoverDate'] = day
+                result['sources'].append('TWSE FMTQIK')
+                break
+        for row in responses.get('pe', []):
+            if not isinstance(row, dict): continue
+            code=str(row.get('Code') or '').strip()
+            if not symbol_ok(code):continue
+            val=num(row.get('PEratio'))
+            if val is not None and val>0:
+                result['valuation'][code] = {'pe': val, 'date': iso_date(row.get('Date')),
+                                              'source': 'TWSE 官方本益比（日資料）'}
+        if result['valuation']: result['sources'].append('TWSE BWIBBU_ALL')
+        return result
+    return cached('market-summary', 900, loader)
 
 
 def finmind_candles(code, days, token=''):
@@ -418,6 +483,10 @@ class Handler(SimpleHTTPRequestHandler):
             codes = [c.strip() for c in (args.get('codes') or [''])[0].split(',') if c.strip()]
             try: return self.json_reply(200, intraday_quotes(codes))
             except DataError as e: return self.json_reply(e.status, {'error':str(e)})
+        if parsed.path == '/api/summary':
+            try: return self.json_reply(200, market_summary())
+            except DataError as error: return self.json_reply(error.status, {'error': str(error)})
+            except Exception: return self.json_reply(502, {'error': '大盤統計資料暫不可用'})
         if parsed.path == '/api/health':
             return self.json_reply(200, {'ok':True, 'backend':'TWSE Pro', 'time':datetime.now().isoformat(timespec='seconds')})
         if parsed.path == '/api/stocks':
