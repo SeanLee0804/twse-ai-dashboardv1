@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: twse-ai-data-api
+    runtime: python
+    plan: free
+    buildCommand: python -m compileall -q server.py
+    startCommand: python server.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: GOOGLE_CLIENT_ID
+        value: 446221628195-lrdjaoj29jdgej5p2ukap77g1il9bcut.apps.googleusercontent.com
+      - key: ALLOWED_ORIGINS
+        value: https://seanlee0804.github.io,http://localhost:8000,http://127.0.0.1:8000
+      - key: AI_ALLOWED_EMAILS
+        value: 034sean0804@gmail.com
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FINMIND_TOKEN
+        sync: false
