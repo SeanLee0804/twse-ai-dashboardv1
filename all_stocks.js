@@ -47,7 +47,7 @@ function renderMarketSummary(){
  const color=rise?'text-red-400':fall?'text-emerald-400':'text-slate-300';
  for(const id of ['taiex-price','taiex-change']){const el=$(id);if(el){el.classList.remove('text-emerald-400','text-red-400','text-slate-300');el.classList.add(color);}}
  textInto('taiex-vol',summaryState.turnoverHundredMillion==null?'—':`${number(summaryState.turnoverHundredMillion)} 億`);
- textInto('taiex-date',x?.date?`官方盤後 · ${x.date}`:'官方資料未同步');
+ textInto('taiex-date',x?.date?`加權指數資料日 ${x.date}${mostRecentDay()&&x.date<mostRecentDay()?' · 指數仍待更新':''}`:'官方資料未同步');
  textInto('taiex-ma120','—');
 }
 async function loadMarketSummary(){
@@ -87,7 +87,7 @@ function ingest(row){
  // Keep a *newer dated* intraday transaction instead of replacing it with yesterday's
  // official daily snapshot during the exchange's post-close publication gap.
  const latest=latestIntradayQuotes.get(item.code);
- if(latest?.price>0 && latest?.date && (!item.date || latest.date>item.date)){
+ if(latest?.price>0 && latest?.date && (!item.date || latest.date>=item.date)){
    Object.assign(item,{price:latest.price,prevClose:latest.prevClose,change:latest.change,
      open:latest.open??null,high:latest.high??null,low:latest.low??null,volume:null,
      date:latest.date,source:latest.source,quality:latest.quality,asOf:latest.asOf});
@@ -109,29 +109,37 @@ async function loadUniverse(refresh=false){
  model.loadingMarket=(async()=>{
    const info=$('market-catalog-status'); if(info) info.textContent='正在取得 TWSE + TPEx 全市場名單…';
    try{
-     const json=await localFetch('/api/stocks');
+     const json=await localFetch('/api/stocks'+(refresh?'?refresh=1':''));
      if(!Array.isArray(json.stocks)||!json.stocks.length) throw new Error('股票清單是空的');
      model.market=json.stocks;
      model.map.clear();
      for(const item of json.stocks) ingest(item);
      model.backendOk=true;
-     model.marketStatus=`已載入 ${json.total.toLocaleString('zh-TW')} 檔上市／上櫃證券`;
-     if(json.errors?.length) model.marketStatus+=`（部分市場資料失敗：${json.errors.join('、')}）`;
+     const mdates=json.marketDates||{};
+     const lag=Boolean(json.isLagging);
+     model.marketStatus=`已載入 ${json.total.toLocaleString('zh-TW')} 檔證券｜上市 ${mdates['上市']||'無資料'} ／上櫃 ${mdates['上櫃']||'無資料'}`;
+     if(json.errors?.length) model.marketStatus+=`（部分來源不可用）`;
+     const freshness=$('market-freshness-banner');
+     if(freshness){
+        freshness.className='rounded-xl px-4 py-3 border text-xs '+(lag?'bg-amber-500/10 border-amber-500/40 text-amber-200':'bg-emerald-500/10 border-emerald-500/30 text-emerald-200');
+        freshness.textContent=lag?`行情注意：資料源尚未全部更新到 ${json.expectedSessionDate}。上市：${mdates['上市']||'—'}，上櫃：${mdates['上櫃']||'—'}。畫面保留實際日期，不以舊價格冒充今日收盤。`:`官方交易日：上市 ${mdates['上市']||'—'}、上櫃 ${mdates['上櫃']||'—'}。非盤中即時；請以欄位顯示的日期為準。`;
+     }
+     if(lag) model.marketStatus+=' · 部分資料尚未更新至目前交易日';
      if(info)info.textContent=model.marketStatus;
      const c=$('market-total-count');if(c)c.textContent=json.total.toLocaleString('zh-TW');
-     updateFinMindStatusUI(!json.errors?.length, json.errors?.length?'部分市場同步：官方快照':'TWSE / TPEx 官方行情快照');
+     updateFinMindStatusUI(!json.isLagging && !json.errors?.length, json.isLagging?'行情交易日未全部更新':json.errors?.length?'部分市場來源待確認':'TWSE / TPEx 官方盤後行情');
      // 表格、側邊自選、圖表與搜尋聯動
      model.page=1; renderEnhancedTable(); renderWatchlistPage(); renderTickerTapeAndPills();
-     refreshFocusCards();
+     refreshFocusCards();window.renderRecommendations();refreshCalculatorOptions();
      if(model.map.has(currentStockCode)) updateSelectedDetails(currentStockCode);
      const newest = mostRecentDay();
-     quoteStatus(`官方最近交易日 ${newest||'日期未提供'} · 盤中僅追蹤焦點與自選股（最多12檔）`, 'text-slate-400');
+     quoteStatus(`官方市場最新資料日 ${newest||'未知'} · 上市／上櫃來源日期可能不同 · 盤中僅追蹤焦點與自選股`, json.isLagging?'text-amber-300':'text-slate-400');
      void loadMarketSummary();
      return true;
    }catch(err){
      model.backendOk=false;
      model.marketStatus=`全市場名單載入失敗：${err.message}`;
-     if(info) info.textContent=model.marketStatus + '。請用 start.bat 啟動網站，勿使用 py -m http.server。';
+     if(info) info.textContent=model.marketStatus + '。請檢查 Render 後端與網路、GitHub Pages 的 api-config.js。';
      updateFinMindStatusUI(false,'股票資料服務未連線');
      renderEnhancedTable();
      return false;
@@ -141,7 +149,7 @@ async function loadUniverse(refresh=false){
 }
 window.syncAllRealFinMindData=async function(notify=false){
  const ok=await loadUniverse(true);
- if(notify)showToast(ok?'已更新 TWSE／TPEx 官方盤後行情名單':'資料更新失敗；請查看「全市場」狀態提示');
+ if(notify)showToast(ok?'已更新可取得的官方交易日行情（請查看交易日期）':'資料更新失敗；請查看全市場狀態提示');
  return ok;
 };
 window.fetchRealStockDataFromFinMind=async function(code){
@@ -187,7 +195,7 @@ async function refreshIntradayQuotes(){
       changed=true;
     }
     if(changed){
-      refreshFocusCards();renderTickerTapeAndPills();renderEnhancedTable();renderWatchlistPage();
+      refreshFocusCards();renderTickerTapeAndPills();renderEnhancedTable();renderWatchlistPage();window.renderRecommendations();window.updateCalculator();
       updateSelectedDetails(currentStockCode);
     }
     const mostRecent=result.quotes.map(q=>q.asOf).filter(Boolean).sort().at(-1);
@@ -241,8 +249,19 @@ function getFiltered(){
  const q=model.query.trim().toLowerCase();
  let rows=model.market.filter(x=> (!q || x.code.toLowerCase().includes(q) || x.name.toLowerCase().includes(q))
     && (model.kind==='ALL'|| (model.kind==='STARRED' ? isStarred(x.code): model.kind==='ETF'? x.type==='ETF': x.market===model.kind && x.type!=='ETF')));
- if(model.sort==='name')rows=rows.slice().sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant'));
- if(model.sort==='price')rows=rows.slice().sort((a,b)=>(b.price??-1)-(a.price??-1));
+ if(q){
+    const rank=x=>{
+      const name=x.name.toLowerCase(), code=x.code.toLowerCase();
+      if(name===q || code===q)return 0;
+      // Common incomplete query 「台達」 must not silently default to 台達化 (1309).
+      if(q==='台達' && code==='2308')return 1;
+      if(name.startsWith(q))return 2;
+      if(code.startsWith(q))return 3;
+      return 4;
+    };
+    rows=rows.slice().sort((a,b)=>rank(a)-rank(b)||a.code.localeCompare(b.code));
+ }else if(model.sort==='name')rows=rows.slice().sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant'));
+ else if(model.sort==='price')rows=rows.slice().sort((a,b)=>(b.price??-1)-(a.price??-1));
  return rows;
 }
 function renderEnhancedTable(){
@@ -290,9 +309,9 @@ window.filterMarketTable=function(kind){model.kind=kind==='STARRED'?'STARRED':ki
 function searchResults(q){
  const query=q.trim().toLowerCase();
  if(!query || !model.market.length)return [];
- const matched=model.market.filter(x=>x.code.startsWith(query)||x.name.toLowerCase().startsWith(query));
- if(matched.length<12)matched.push(...model.market.filter(x=>!(x.code.startsWith(query)||x.name.toLowerCase().startsWith(query)) && (x.code.includes(query)||x.name.toLowerCase().includes(query))).slice(0,12-matched.length));
- return matched.slice(0,12);
+ const matched=model.market.filter(x=>x.code.includes(query)||x.name.toLowerCase().includes(query));
+ const rank=x=>(x.code===query||x.name.toLowerCase()===query)?0:(query==='台達'&&x.code==='2308')?1:x.name.toLowerCase().startsWith(query)?2:x.code.startsWith(query)?3:4;
+ return matched.sort((a,b)=>rank(a)-rank(b)||a.code.localeCompare(b.code)).slice(0,12);
 }
 function showDropdown(){
  const input=$('stock-search-input'),dd=$('search-dropdown');if(!input||!dd)return;
@@ -484,6 +503,65 @@ window.renderWatchlistPage=function(){
  <div class="text-[10px] text-slate-500">${safeText(x?asOfText(x):'')}</div></div><button data-watch-open="${safeText(c)}" class="px-3 py-1 bg-indigo-600 rounded text-xs text-white shrink-0">查看 K 線</button></div>`;
  }).join('');
 };
+// The original six-stock recommendations included unsupported assertions; use sourced quote-only observation cards.
+let recommendationFilter='ALL';
+const observationCodes=['2308','2330','2454','3017','2317','0050'];
+window.renderRecommendations=function(){
+ const el=$('recommend-grid');if(!el)return;
+ const selected=observationCodes.filter(code=>{
+   if(recommendationFilter==='ALL')return true;
+   if(recommendationFilter==='ETF')return code.startsWith('00');
+   if(recommendationFilter==='AI_CORE')return ['2308','2330','2454','3017'].includes(code);
+   if(recommendationFilter==='VALUE')return ['2317','2330'].includes(code);
+   return true;
+ });
+ el.innerHTML=selected.map(code=>{
+   const x=model.map.get(code), name=x?.name||STOCK_DB[code]?.name||code;
+   return `<div class="glass-panel rounded-2xl p-4 space-y-3"><div class="flex justify-between items-center"><strong class="text-white">${safeText(code)} ${safeText(name)}</strong><span class="text-[10px] px-2 py-1 rounded bg-slate-800 text-slate-400">觀察清單，非推薦</span></div>
+      <div class="font-mono text-xl font-bold ${x?.change>0?'text-red-400':x?.change<0?'text-emerald-400':'text-white'}">${x?.price>0?number(x.price):'—'} <span class="text-xs text-slate-500">元</span></div>
+      <p class="text-xs text-slate-400">${safeText(x?asOfText(x):'官方報價尚未同步')}</p>
+      <button data-observe="${safeText(code)}" class="rounded bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white">查看日 K 與交易資料</button></div>`;
+ }).join('');
+};
+window.filterRecommendations=function(kind){
+ recommendationFilter=kind;
+ for(const button of document.querySelectorAll('.rec-filter-btn')){
+   button.classList.toggle('bg-indigo-600',button.id===`rec-filter-${kind}`);
+   button.classList.toggle('text-white',button.id===`rec-filter-${kind}`);
+ }
+ window.renderRecommendations();
+};
+// Use a transparent arithmetic simulator instead of historical, fabricated target prices.
+window.updateCalculator=function(){
+ const selector=$('calc-stock-select');
+ const code=selector?.value||currentStockCode;
+ const quote=model.map.get(code), price=Number(quote?.price);
+ const budget=Number($('calc-budget-input')?.value||0);
+ const valid=price>0 && budget>0;
+ const ratios=[0.2,0.4,0.4];
+ let totalShares=0,totalSpent=0;
+ ratios.forEach((ratio,i)=>{
+   const n=i+1, amount=budget*ratio,shares=valid?Math.floor(amount/price):0;
+   totalShares+=shares;totalSpent+=shares*price;
+   textInto(`stage${n}-price`,valid?number(price)+' 元':'—');
+   textInto(`stage${n}-amount`,Number.isFinite(amount)?'NT$ '+number(amount,0):'—');
+   textInto(`stage${n}-shares`,valid?shares+' 股':'—');
+ });
+ textInto('calc-total-shares',valid?totalShares+' 股':'—');
+ textInto('calc-avg-cost',valid&&totalShares?number(totalSpent/totalShares)+' 元 / 股':'—');
+ textInto('calc-target-profit','未設定目標價 · 不預估報酬');
+ const note=$('calculator-source-note');
+ if(note)note.textContent=quote?`以 ${asOfText(quote)} 為試算基準；三批價格相同只是預算分配示例，不代表建議買進價。`:'請先同步行情，才能進行金額試算。';
+};
+function refreshCalculatorOptions(){
+ const sel=$('calc-stock-select');if(!sel)return;
+ const codes=[...new Set([...observationCodes,...(userState?.starredCodes||[])])].filter(code=>model.map.has(code));
+ const selected=sel.value||currentStockCode;
+ sel.innerHTML=codes.map(code=>`<option value="${safeText(code)}">${safeText(code)} ${safeText(model.map.get(code).name)}</option>`).join('');
+ if(codes.includes(selected))sel.value=selected;
+ else if(codes.length)sel.value=codes[0];
+ window.updateCalculator();
+}
 function installEvents(){
  setupSearchEvents();
  $('market-search')?.addEventListener('input',e=>{model.query=e.target.value;model.page=1;renderEnhancedTable();});
@@ -498,6 +576,18 @@ function installEvents(){
  const row=e.target.closest('[data-stock]');if(row)openStockInTerminal(row.dataset.stock);
  });
  $('watchlist-cards-container')?.addEventListener('click',e=>{const button=e.target.closest('[data-watch-open]');if(button)openStockInTerminal(button.dataset.watchOpen);});
+ $('recommend-grid')?.addEventListener('click',e=>{const b=e.target.closest('[data-observe]');if(b)openStockInTerminal(b.dataset.observe);});
+}
+// Before the old dashboard initializes, remove fixed example figures and unsupported chip claims.
+for(const stock of Object.values(STOCK_DB)){
+ if(!stock||typeof stock!=='object')continue;
+ for(const key of ['price','prevClose','open','high','low','volume','foreignPct','foreignNetToday','trustNetToday','dealerNetToday','foreignShares','foreign20dDiff','foreignNet5d','trustNet5d','marginUsage','whale400Pct','targetPrice','eps26','eps27'])stock[key]=0;
+ for(const key of ['history1D','history5D','history1M','history1Y','foreignHist'])stock[key]=[];
+ stock.desc='等待官方資料及公司公告驗證';
+ stock.chipStreak='法人資料未同步';
+ stock.yield='—';stock.fairRange='—';stock.supportText='—';
+ stock.rating='僅供觀察';stock.thesis='未經資料驗證，不提供買賣論點';
+ stock.stagePrices=[0,0,0];stock.dataSource='官方行情尚未同步';
 }
 const previousOnload=window.onload;
 window.onload=async function(){
@@ -506,6 +596,7 @@ window.onload=async function(){
  installEvents();
  model.selectedRange='3M';
  model.marketStatus='正在載入 TWSE／TPEx 股票名單…';
+ document.querySelectorAll('[data-static-demo]').forEach(el=>{el.textContent='—'});
  renderEnhancedTable();
  await loadUniverse();
  startQuotePolling();
