@@ -9,6 +9,9 @@ const apiUrl = path => API_BASE ? API_BASE + path : path;
 const LIVE_REFRESH_MS = 15000;
 let liveTimer = null;
 const lastQuoteDates = new Map();
+const latestIntradayQuotes = new Map();
+const summaryState = { index: null, valuation: {}, lastRefresh: null, loading: false };
+let quoteFetchBusy = false;
 const pinned = { time: null, close: null };
 const K_RANGES = {'1D':'5D','5D':'5D','1M':'1M','3M':'3M','6M':'6M','1Y':'1Y'};
 const model = { market: [], map: new Map(), marketStatus: '載入中', query:'', kind:'ALL', page:1, pageSize:40,
@@ -25,6 +28,45 @@ const localFetch = async (url, options={}) => {
    } finally { clearTimeout(t); }
 };
 const FALLBACK = ['2308','2330','2454','3017','2317','0050'];
+function isIntraday(item){return item?.quality === 'intraday_reference' && Boolean(item?.asOf);}
+function asOfText(item){
+ if(!item)return '來源未同步';
+ if(!(item.price>0))return '尚無可用成交價格 · '+(item.date||'日期未知');
+ const label=isIntraday(item)?'盤中參考':'官方盤後';
+ const date=item.date||'日期未提供';
+ const time=isIntraday(item)?' '+item.asOf.slice(11,16):'';
+ return `${label} · ${date}${time} · ${item.source||'TWSE／TPEx'}`;
+}
+function textInto(id,val){const el=$(id);if(el)el.textContent=val;}
+function mostRecentDay(){return model.market.map(x=>x.date).filter(Boolean).sort().at(-1)||null;}
+function renderMarketSummary(){
+ const x=summaryState.index;
+ textInto('taiex-price',x?.level>0?number(x.level):'—');
+ textInto('taiex-change',x?.change==null?'漲跌：—':`${x.change>0?'▲':x.change<0?'▼':'—'} ${number(Math.abs(x.change))}（${x.change>0?'+':''}${x.pct?.toFixed(2)??'—'}%）`);
+ const rise=x?.change>0,fall=x?.change<0;
+ const color=rise?'text-red-400':fall?'text-emerald-400':'text-slate-300';
+ for(const id of ['taiex-price','taiex-change']){const el=$(id);if(el){el.classList.remove('text-emerald-400','text-red-400','text-slate-300');el.classList.add(color);}}
+ textInto('taiex-vol',summaryState.turnoverHundredMillion==null?'—':`${number(summaryState.turnoverHundredMillion)} 億`);
+ textInto('taiex-date',x?.date?`官方盤後 · ${x.date}`:'官方資料未同步');
+ textInto('taiex-ma120','—');
+}
+async function loadMarketSummary(){
+ if(summaryState.loading)return;
+ summaryState.loading=true;
+ try {
+   const data=await localFetch('/api/summary');
+   summaryState.index=data.index||null;
+   summaryState.valuation=data.valuation||{};
+   summaryState.turnoverHundredMillion=data.turnoverHundredMillion??null;
+   summaryState.lastRefresh=Date.now();
+   renderMarketSummary();refreshFocusCards();updateSelectedDetails(currentStockCode);
+ }catch(err){renderMarketSummary();console.warn('大盤摘要尚無資料',err.message)}
+ finally{summaryState.loading=false;}
+}
+function focusPriceTooltip(code){
+ const item=model.map.get(code);return item?asOfText(item):'尚未取得真實行情';
+}
+
 function makeEmpty(code, name, market='未知', type='股票') {
  const existing=STOCK_DB[code];
  if(existing) { existing.market=market; existing.stockType=type; return existing; }
@@ -42,6 +84,14 @@ function makeEmpty(code, name, market='未知', type='股票') {
 function ingest(row){
  const item={...row,code:String(row.code||'').trim(),name:String(row.name||'').trim()};
  if(!item.code || !item.name)return;
+ // Keep a *newer dated* intraday transaction instead of replacing it with yesterday's
+ // official daily snapshot during the exchange's post-close publication gap.
+ const latest=latestIntradayQuotes.get(item.code);
+ if(latest?.price>0 && latest?.date && (!item.date || latest.date>item.date)){
+   Object.assign(item,{price:latest.price,prevClose:latest.prevClose,change:latest.change,
+     open:latest.open??null,high:latest.high??null,low:latest.low??null,volume:null,
+     date:latest.date,source:latest.source,quality:latest.quality,asOf:latest.asOf});
+ }
  model.map.set(item.code,item);
  const s=makeEmpty(item.code,item.name,item.market,item.type);
  s.name=item.name; s.market=item.market; s.stockType=item.type;
@@ -74,6 +124,9 @@ async function loadUniverse(refresh=false){
      model.page=1; renderEnhancedTable(); renderWatchlistPage(); renderTickerTapeAndPills();
      refreshFocusCards();
      if(model.map.has(currentStockCode)) updateSelectedDetails(currentStockCode);
+     const newest = mostRecentDay();
+     quoteStatus(`官方最近交易日 ${newest||'日期未提供'} · 盤中僅追蹤焦點與自選股（最多12檔）`, 'text-slate-400');
+     void loadMarketSummary();
      return true;
    }catch(err){
      model.backendOk=false;
@@ -102,16 +155,17 @@ function quoteStatus(message, tone='text-slate-400') {
   el.textContent=message;
 }
 function getQuoteCodes(){
-  const ids=[currentStockCode,...(userState?.starredCodes||[])];
+  const ids=[currentStockCode,...FALLBACK,...(userState?.starredCodes||[])];
   return [...new Set(ids.filter(x=>/^(?:\d{4}|00\d{3,4})$/.test(String(x))))].slice(0,12);
 }
 async function refreshIntradayQuotes(){
-  if(!model.backendOk || document.hidden || !navigator.onLine)return;
+  if(!model.backendOk || document.hidden || !navigator.onLine || quoteFetchBusy)return;
+  quoteFetchBusy=true;
   const codes=getQuoteCodes();if(!codes.length)return;
   try{
     const result=await localFetch('/api/quotes?codes='+encodeURIComponent(codes.join(',')));
     if(result.status==='market_closed'){
-      quoteStatus('非盤中：顯示 TWSE／TPEx 官方盤後資料','text-slate-400');return;
+      quoteStatus(`非盤中 · 最近官方盤後 ${mostRecentDay()||'日期未知'}（不是即時報價）`,'text-slate-400');return;
     }
     if(result.status!=='intraday_reference' || !result.quotes?.length){
       quoteStatus(result.message || '無新盤中行情，保留官方盤後資料','text-amber-300');return;
@@ -125,6 +179,8 @@ async function refreshIntradayQuotes(){
       v.price=Number(q.price);v.prevClose=q.prevClose;
       v.change=q.change;v.source=q.source;v.asOf=q.asOf;
       v.date=q.date;v.quality=q.quality;
+      v.open=q.open??null;v.high=q.high??null;v.low=q.low??null;v.volume=null;
+      latestIntradayQuotes.set(q.code,{...q});
       const stock=STOCK_DB[q.code];
       if(stock){stock.price=v.price; stock.prevClose=q.prevClose||0; stock.dataSource=q.source;}
       lastQuoteDates.set(q.code,q.asOf);
@@ -137,28 +193,48 @@ async function refreshIntradayQuotes(){
     const mostRecent=result.quotes.map(q=>q.asOf).filter(Boolean).sort().at(-1);
     quoteStatus('盤中參考（非逐筆即時）· '+(mostRecent||'時間未知')+' · 15秒輪詢','text-cyan-300');
   }catch(err){
-    quoteStatus('盤中資料暫無法更新：'+err.message+'；保留盤後資料','text-amber-300');
-  }
+    quoteStatus('盤中資料暫無法更新：'+err.message+'；保留最近官方盤後價格','text-amber-300');
+  }finally{quoteFetchBusy=false;}
 }
 function startQuotePolling(){
   if(liveTimer)clearInterval(liveTimer);
-  liveTimer=setInterval(refreshIntradayQuotes,LIVE_REFRESH_MS);
+  liveTimer=setInterval(()=>{
+    void refreshIntradayQuotes();
+    if(!summaryState.lastRefresh || Date.now()-summaryState.lastRefresh>15*60*1000) void loadMarketSummary();
+  },LIVE_REFRESH_MS);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshIntradayQuotes();});
   refreshIntradayQuotes();
 }
 function refreshFocusCards(){
  for(const code of ['2308','2330']){
-   const item=model.map.get(code);if(!item)continue;
+   const item=model.map.get(code);
    const price=$('card-'+code+'-price');
-   if(price)price.textContent=number(item.price);
+   if(price){price.textContent=item?.price>0?number(item.price):'—';price.title=focusPriceTooltip(code);
+     price.classList.remove('text-red-400','text-emerald-400','text-slate-300');
+     price.classList.add(item?.change>0?'text-red-400':item?.change<0?'text-emerald-400':'text-slate-300');}
    const change=$('card-'+code+'-change');
-   if(change)change.textContent=item.change==null?'—':`${item.change>0?'▲':item.change<0?'▼':'—'} ${number(Math.abs(item.change))}`;
+   if(change)change.textContent=item?.change==null?'—':`${item.change>0?'▲':item.change<0?'▼':'—'} ${number(Math.abs(item.change))}`;
    const pct=$('card-'+code+'-pct');
-   if(pct){const prev=item.price!=null&&item.change!=null?item.price-item.change:null;
-       pct.textContent=prev>0?`${(item.change/prev*100).toFixed(2)}%`:'—';}
-   const foreign=$('card-'+code+'-fpct');if(foreign)foreign.textContent='—';
-   // Former static institutional numbers are samples, not official live data.
-   const inst=$('card-'+code+'-inst');if(inst)inst.textContent='法人資料尚未同步';
+   if(pct){const prev=item?.price>0&&item?.change!=null?item.price-item.change:null;
+       pct.textContent=prev>0?`${item.change>0?'+':''}${(item.change/prev*100).toFixed(2)}%`:'—';
+       pct.classList.remove('bg-emerald-500','bg-red-500','bg-slate-700','text-slate-950','text-white');
+       pct.classList.add(prev>0?(item.change>0?'bg-red-500':item.change<0?'bg-emerald-500':'bg-slate-700'):'bg-slate-700', prev>0&&item.change!==0?'text-slate-950':'text-white');
+   }
+   textInto('card-'+code+'-fpct','—');
+   textInto('card-'+code+'-inst','法人資料尚未同步');
+   const pe=summaryState.valuation[code];
+   textInto('card-'+code+'-pe',pe?.pe>0?`${number(pe.pe)} 倍`:'—');
+   const pel=$('card-'+code+'-pe');if(pel)pel.title=pe?.date?`${pe.source} · ${pe.date}`:'本益比尚未同步';
+   textInto('card-'+code+'-asof',item?asOfText(item):'行情未同步');
+ }
+ for(const code of ['2330','2454','2308','2317']){
+   const item=model.map.get(code);
+   const el=$('spotlight-'+code+'-price');
+   if(!el)continue;
+   el.textContent=item?.price>0?`${number(item.price)} 元`:'—';
+   el.title=item?asOfText(item):'尚未同步行情';
+   el.classList.remove('text-red-400','text-emerald-400','text-slate-300');
+   el.classList.add(item?.change>0?'text-red-400':item?.change<0?'text-emerald-400':'text-slate-300');
  }
 }
 function getFiltered(){
@@ -189,12 +265,26 @@ function renderEnhancedTable(){
      <td class="py-3 px-3 text-right num-mono font-bold ${cls}">${number(x.price)}</td>
      <td class="py-3 px-3 text-right num-mono ${cls}">${pct}</td>
      <td class="py-3 px-3 text-right text-slate-500">—</td><td class="py-3 px-3 text-right text-slate-500">—</td><td class="py-3 px-3 text-right text-slate-500">—</td>
-     <td class="py-3 px-3 text-right text-[10px] text-slate-400">${safeText(x.source)}<br>${safeText(x.date||'日期未提供')}</td>
+     <td class="py-3 px-3 text-right text-[10px] text-slate-400">${safeText(asOfText(x))}</td>
      <td class="py-3 px-3 text-right text-slate-500">—</td>
      <td class="py-3 px-3 text-center text-indigo-400 whitespace-nowrap">開啟 K 線 →</td>
    </tr>`;
  }).join('') || '<tr><td colspan="10" class="py-7 text-center text-slate-400">沒有符合條件的股票</td></tr>';
 }
+// All six focus ticker values are sourced from the same market map as the detail page.
+window.renderTickerTapeAndPills=function(){
+  const tape=$('ticker-tape');
+  if(tape)tape.innerHTML=FALLBACK.map(code=>{
+    const item=model.map.get(code);
+    const name=item?.name||STOCK_DB[code]?.name||code;
+    const value=item?.price>0?number(item.price):'—';
+    const cls=item?.change>0?'text-red-400':item?.change<0?'text-emerald-400':'text-slate-300';
+    const label=focusPriceTooltip(code);
+    return `<span title="${safeText(label)}" class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-slate-900 border border-slate-800"><span class="font-bold text-slate-200">${safeText(code)} ${safeText(name)}</span><span class="num-mono font-bold ${cls}">${value}</span></span>`;
+  }).join('');
+  const quick=$('quick-stock-pills');
+  if(quick)quick.innerHTML=FALLBACK.map(code=>`<button onclick="selectStock('${code}',true)" class="px-3 py-1.5 rounded-xl text-xs font-semibold ${code===currentStockCode?'bg-indigo-600 text-white':'bg-slate-900 text-slate-300'}">${safeText(code)} ${safeText(model.map.get(code)?.name||STOCK_DB[code]?.name||'')}</button>`).join('');
+};
 window.renderDashboardMarketTable=renderEnhancedTable;
 window.filterMarketTable=function(kind){model.kind=kind==='STARRED'?'STARRED':kind==='HIGH_FOREIGN'?'ALL':kind==='TRUST_BUY'?'ALL':kind;model.page=1;renderEnhancedTable();};
 function searchResults(q){
@@ -231,17 +321,21 @@ function updateSelectedDetails(code){
  $('detail-category').textContent=`${item?.market||'資料待確認'} · ${item?.type||'股票'}`;
  $('detail-price').textContent=number(item?.price);
  $('detail-price').className='num-mono text-3xl sm:text-4xl font-black '+(item?.change>0?'text-red-400':item?.change<0?'text-emerald-400':'text-slate-200');
- $('detail-change').textContent=item?.change==null?'漲跌：—':`${item.change>0?'▲':item.change<0?'▼':'—'} ${number(Math.abs(item.change))}（盤後）`;
- $('detail-desc').textContent=`${item?.source||'尚未同步'} · 資料日期 ${item?.date||'未知'}；非即時報價。`;
+ $('detail-change').textContent=item?.change==null?'漲跌：—':`${item.change>0?'▲':item.change<0?'▼':'—'} ${number(Math.abs(item.change))}（${isIntraday(item)?'盤中參考':'盤後'}）`;
+ $('detail-desc').textContent=item?`${asOfText(item)}；${isIntraday(item)?'非授權逐筆串流，可能延遲':'非盤中即時報價'}`:'尚未同步官方資料；未顯示示範股價';
  $('detail-api-badge').textContent=item?.source||'尚無官方行情';
  $('detail-limit-badge')?.classList.add('hidden');
  const data={'detail-prev':item?.price != null&&item?.change!=null?item.price-item.change:null,
  'detail-open':item?.open,'detail-hl':item?.high!=null&&item?.low!=null?`${number(item.high)} / ${number(item.low)}`:null,
- 'detail-vol':item?.volume!=null?item.volume/1000:null};
+ 'detail-vol':!isIntraday(item)&&item?.volume!=null?item.volume/1000:null};
  for(const [id,v]of Object.entries(data))$(id).textContent=typeof v==='string'?v:number(v,id==='detail-vol'?0:2);
  for(const id of ['header-foreign-pct','detail-foreign-pct','detail-foreign-net','detail-trust-net','detail-whale-pct','detail-pe','detail-support','chip-foreign-pct-big','chip-foreign-shares','chip-foreign-20d-diff']){
    const el=$(id);if(el)el.textContent='—';
  }
+ const pe=summaryState.valuation[code];
+ if(pe?.pe>0)textInto('detail-pe',`${number(pe.pe)} 倍（${pe.date||'日期未提供'}）`);
+ textInto('detail-quote-asof',item?asOfText(item):'最新行情尚未同步');
+ textInto('candle-live-quote',item?.price>0?`當前可得價 ${number(item.price)} · ${isIntraday(item)?'盤中參考':'最近收盤'} · ${item.asOf||item.date||'—'}`:'尚無報價');
  $('chip-streak-badge') && ($('chip-streak-badge').textContent='此股法人資料尚未驗證');
  $('nav-current-stock-badge')&&($('nav-current-stock-badge').textContent=code);
  updateTerminalStarButton();
@@ -251,6 +345,7 @@ window.selectStock=function(code, goPage=false){
  if(!model.map.has(clean) && !STOCK_DB[clean]){showToast('查無股票代號：'+clean);return;}
  currentStockCode=clean;
  updateSelectedDetails(clean);
+ if(model.backendOk)void refreshIntradayQuotes();
  if(goPage) switchPage('terminal');
  else if(currentPage==='terminal') loadCandles();
 };
@@ -385,8 +480,8 @@ window.renderWatchlistPage=function(){
  el.innerHTML=userState.starredCodes.map(c=>{
  const x=model.map.get(c),s=STOCK_DB[c],name=x?.name||s?.name||'資料待同步';
  return `<div class="glass-panel rounded-2xl p-4 flex items-center justify-between gap-2"><div><div class="font-bold text-white">${safeText(c)} ${safeText(name)}</div>
- <div class="text-xs text-cyan-400 mt-1">${x?.price!=null?'官方盤後 '+number(x.price)+' 元':'尚無最新價格'}</div>
- <div class="text-[10px] text-slate-500">${safeText(x?.date||'')}</div></div><button data-watch-open="${safeText(c)}" class="px-3 py-1 bg-indigo-600 rounded text-xs text-white shrink-0">查看 K 線</button></div>`;
+ <div class="text-xs text-cyan-400 mt-1">${x?.price!=null?number(x.price)+' 元 · '+(isIntraday(x)?'盤中參考':'官方盤後'):'尚無可靠行情'}</div>
+ <div class="text-[10px] text-slate-500">${safeText(x?asOfText(x):'')}</div></div><button data-watch-open="${safeText(c)}" class="px-3 py-1 bg-indigo-600 rounded text-xs text-white shrink-0">查看 K 線</button></div>`;
  }).join('');
 };
 function installEvents(){
