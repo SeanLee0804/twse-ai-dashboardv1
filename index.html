@@ -173,7 +173,7 @@
                             </span>
                         </div>
                         <p class="text-[11px] text-slate-400">
-                            <span id="header-today-date">載入日期中...</span> • 串接真實法人買賣超與外資持股 • 行情依資料來源公告時間更新
+                            <span id="header-today-date">載入日期中...</span> • 串接真實法人買賣超與外資持股 • 全市場 AI 動態日報自動更新
                         </p>
                     </div>
                 </div>
@@ -281,7 +281,7 @@
         </div>
     </div>
 
-    <div class="max-w-7xl mx-auto w-full px-4 py-1 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-sky-400"></i><span id="quote-sync-status" class="text-xs text-slate-400">正在取得行情：盤中參考／盤後收盤會標示實際交易時間</span></div>
+    <div class="max-w-7xl mx-auto w-full px-4 py-1 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-sky-400"></i><span id="quote-sync-status" class="text-xs text-slate-400">行情：正在確認交易時段及來源；盤後與盤中參考資料會分開標示</span></div>
     <!-- 主內容容器 -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
 
@@ -306,7 +306,7 @@
                             </span>
                         </div>
                         <p class="text-xs text-slate-300 leading-relaxed">
-                            系統會取得 TWSE／TPEx 最近可用的盤後資料及盤中參考行情，並由 Gemini AI 綜合分析台積電、聯發科、台達電、鴻海與大盤脈動。
+                            系統會在每天開盤或您點擊更新時，<strong>自動抓取 FinMind 全市場真實數據</strong>，並由 Gemini AI 綜合分析台積電、聯發科、台達電、鴻海與大盤脈動。
                         </p>
                     </div>
 
@@ -314,7 +314,7 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <button onclick="syncAllRealFinMindData(true)" id="btn-sync-finmind" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-emerald-300 transition flex items-center gap-1.5">
                             <i class="fa-solid fa-database" id="icon-sync-finmind"></i>
-                            <span>1. 同步 TWSE／TPEx 官方行情</span>
+                            <span>1. 同步 FinMind 全市場真實數據</span>
                         </button>
 
                         <button onclick="generateDailyAiReport()" id="btn-generate-ai-report" class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-xs sm:text-sm font-black text-white shadow-lg shadow-indigo-500/30 transition flex items-center gap-2">
@@ -347,7 +347,7 @@
                 <div id="ai-report-loading" class="hidden mt-3 p-3 rounded-xl ai-loading-bar border border-indigo-500/40 flex items-center justify-between text-xs">
                     <div class="flex items-center gap-2.5">
                         <i class="fa-solid fa-circle-notch fa-spin text-cyan-400 text-sm"></i>
-                        <span id="ai-loading-step-text" class="font-bold text-white">正在向 FinMind 抓取全市場法人籌碼並呼叫 Gemini AI 產生今日最新日報...</span>
+                        <span id="ai-loading-step-text" class="font-bold text-white">正在使用已同步的行情摘要生成 Gemini 分析，缺少法人資料時會標示未驗證…</span>
                     </div>
                     <span class="num-mono text-[11px] text-cyan-300">依據同步市場資料分析</span>
                 </div>
@@ -359,7 +359,7 @@
                 <div id="card-taiex" class="glass-panel rounded-2xl p-4 border-l-4 border-l-emerald-500">
                     <div class="flex items-center justify-between mb-1">
                         <span class="text-xs font-semibold text-slate-400">台灣加權指數 (TAIEX)</span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"><span id="taiex-date">官方資料未同步</span></span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">官方日期核對</span>
                     </div>
                     <div class="flex items-baseline gap-2 my-1">
                         <span id="taiex-price" class="num-mono text-2xl sm:text-3xl font-extrabold text-emerald-400">—</span>
@@ -375,7 +375,7 @@
                 <div class="glass-panel rounded-2xl p-4 border-l-4 border-l-indigo-500">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs font-semibold text-slate-400">全市場三大法人買賣超</span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300">法人資料待同步</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300">法人數據未驗證</span>
                     </div>
                     <div class="space-y-1.5 text-xs">
                         <div class="flex justify-between items-center">
@@ -392,7 +392,7 @@
                         </div>
                     </div>
                     <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex justify-between text-[11px]">
-                        <span class="text-slate-400">全市場外資市值佔比（未同步）：</span>
+                        <span class="text-slate-400">全市場外資市值佔比：</span>
                         <span class="num-mono font-bold text-cyan-400">—</span>
                     </div>
                 </div>
@@ -416,7 +416,6 @@
                             <span id="card-2308-change" class="num-mono text-xs font-bold text-emerald-400">—</span>
                             <span id="card-2308-pct" class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500 text-slate-950">—</span>
                         </div>
-                        <div id="card-2308-asof" class="text-[10px] text-slate-500 mt-1">等待官方行情</div>
                     </div>
                     <div class="grid grid-cols-2 gap-1 mt-3 pt-2.5 border-t border-slate-800/80 text-[11px] text-slate-400">
                         <div>法人：<span id="card-2308-inst" class="num-mono text-slate-200 font-semibold truncate block">—</span></div>
@@ -443,7 +442,6 @@
                             <span id="card-2330-change" class="num-mono text-xs font-bold text-emerald-400">—</span>
                             <span id="card-2330-pct" class="num-mono text-[11px] font-semibold text-emerald-400">—</span>
                         </div>
-                        <div id="card-2330-asof" class="text-[10px] text-slate-500 mt-1">等待官方行情</div>
                     </div>
                     <div class="grid grid-cols-2 gap-1 mt-3 pt-2.5 border-t border-slate-800/80 text-[11px] text-slate-400">
                         <div>大戶比：<span class="num-mono text-slate-200 font-semibold">—</span></div>
@@ -495,24 +493,24 @@
 
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                             <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
-                                <div class="text-[11px] text-slate-400">台積電 (2330) 最新可得價</div>
-                                <div class="num-mono text-sm sm:text-base font-bold text-cyan-400 mt-0.5" id="spotlight-2330-price">—</div>
-                                <div class="text-[10px] text-slate-400">官方盤後／盤中參考</div>
+                                <div class="text-[11px] text-slate-400">台積電 (2330) 外資比（待同步）</div>
+                                <div class="num-mono text-sm sm:text-base font-bold text-cyan-400 mt-0.5">—</div>
+                                <div class="text-[10px] text-slate-400">外資持股比尚未同步</div>
                             </div>
                             <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
-                                <div class="text-[11px] text-slate-400">聯發科 (2454) 最新可得價</div>
-                                <div class="num-mono text-sm sm:text-base font-bold text-red-400 mt-0.5" id="spotlight-2454-price">—</div>
-                                <div class="text-[10px] text-slate-400">官方盤後／盤中參考</div>
+                                <div class="text-[11px] text-slate-400">聯發科 (2454) 投信比</div>
+                                <div class="num-mono text-sm sm:text-base font-bold text-red-400 mt-0.5">尚未同步投信買賣超</div>
+                                <div class="text-[10px] text-slate-400">研究主題，非已驗證籌碼數據</div>
                             </div>
                             <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
-                                <div class="text-[11px] text-slate-400">台達電 (2308) 最新可得價</div>
-                                <div class="num-mono text-sm sm:text-base font-bold text-amber-400 mt-0.5" id="spotlight-2308-price">—</div>
-                                <div class="text-[10px] text-slate-400">官方盤後／盤中參考</div>
+                                <div class="text-[11px] text-slate-400">台達電 (2308) 狀態</div>
+                                <div class="num-mono text-sm sm:text-base font-bold text-amber-400 mt-0.5">依最新官方價格觀察</div>
+                                <div class="text-[10px] text-slate-400">未驗證企業基本面解讀</div>
                             </div>
                             <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
-                                <div class="text-[11px] text-slate-400">鴻海 (2317) 最新可得價</div>
-                                <div class="num-mono text-sm sm:text-base font-bold text-emerald-400 mt-0.5" id="spotlight-2317-price">—</div>
-                                <div class="text-[10px] text-slate-400">官方盤後／盤中參考</div>
+                                <div class="text-[11px] text-slate-400">鴻海 (2317) 法人資料</div>
+                                <div class="num-mono text-sm sm:text-base font-bold text-emerald-400 mt-0.5">尚未同步投信買賣超</div>
+                                <div class="text-[10px] text-slate-400">請參考官方本益比</div>
                             </div>
                         </div>
 
@@ -523,7 +521,7 @@
                     <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
                         <div class="text-xs text-indigo-300 font-medium flex items-center gap-1.5">
                             <i class="fa-solid fa-lightbulb"></i>
-                            <span>AI 報告僅供研究參考，未生成最新報告前不提供市場買賣建議</span>
+                            <span>AI 日報尚未更新或來源尚待確認時，不提供特定買點建議</span>
                         </div>
                         <button onclick="switchPage('strategy')" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition">
                             進入三階段建倉試算 →
@@ -532,8 +530,9 @@
                 </div>
             </section>
 
+            <div id="market-freshness-banner" class="rounded-xl px-4 py-3 border border-slate-700 bg-slate-900 text-slate-300 text-xs">正在確認上市／上櫃股票的實際交易日…</div>
             <!-- 來源註記：僅全市場股票表格與 K 線來自官方動態資料；上方示範總覽不保證即時 -->
-            <div class="rounded-xl px-4 py-3 border border-amber-500/30 bg-amber-500/10 text-xs text-amber-200">資料區分：首頁加權指數、官方本益比及個股股價由資料服務更新，逐筆即時行情未授權前不保證同步；法人與籌碼無可驗證來源時顯示「—」。其他估值試算與舊 AI 歷史報告非即時行情，不應視為投資建議。</div>
+            <div class="rounded-xl px-4 py-3 border border-amber-500/30 bg-amber-500/10 text-xs text-amber-200">資料說明：TWSE／TPEx 股價和加權指數分來源載入，交易日可能不同。尚未驗證的法人資料與 AI 歷史報告不應當成當日事實。</div>
             <!-- 第三排：全市場外資持股佔比與三大法人即時籌碼總表 -->
             <section class="glass-panel rounded-2xl p-5 space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
@@ -541,13 +540,13 @@
                         <div class="flex items-center gap-2">
                             <span class="w-2.5 h-6 rounded-full bg-cyan-400"></span>
                             <h2 class="text-base sm:text-lg font-bold text-white">全台上市／上櫃股票搜尋與行情總覽</h2>
-                            <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">TWSE / TPEx 官方盤後行情</span>
+                            <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">TWSE / TPEx 官方盤後行情（以日期為準）</span>
                         </div>
                         <p class="text-xs text-slate-400 mt-0.5">搜尋全部上市／上櫃公司與 ETF；點星號加入自選，點任一股票開啟歷史 K 線與成交量。未有來源的數值一律顯示「—」。</p>
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <span class="text-xs text-cyan-300 font-bold">全市場 <span id="market-total-count">—</span> 檔</span>
+                        <span class="text-xs text-cyan-300 font-bold">證券清單 <span id="market-total-count">—</span> 檔</span>
                     </div>
                 </div>
 
@@ -569,13 +568,13 @@
                             <tr class="border-b border-slate-800 text-[11px] text-slate-400 uppercase">
                                 <th class="py-2.5 px-3 text-center">收藏</th>
                                 <th class="py-2.5 px-3">代號 / 名稱</th>
-                                <th class="py-2.5 px-3 text-right">最新成交價</th>
+                                <th class="py-2.5 px-3 text-right">最新可得價</th>
                                 <th class="py-2.5 px-3 text-right">漲跌幅</th>
                                 <th class="py-2.5 px-4 text-left w-44">外資持股 (%)<br><span class="text-[9px]">未串接顯示 —</span></th>
                                 <th class="py-2.5 px-3 text-right">外資買賣超</th>
                                 <th class="py-2.5 px-3 text-right">投信買賣超</th>
                                 <th class="py-2.5 px-3 text-right">資料來源</th>
-                                <th class="py-2.5 px-3 text-right">本益比（未同步顯示 —）</th>
+                                <th class="py-2.5 px-3 text-right">官方本益比</th>
                                 <th class="py-2.5 px-3 text-center">操作</th>
                             </tr>
                         </thead>
@@ -644,14 +643,16 @@
 
                             <div class="text-right">
                                 <div class="flex items-baseline justify-end gap-2">
-                                    <span id="detail-price" class="num-mono text-3xl sm:text-4xl font-black text-emerald-400">—</span>
+                                    <span id="detail-price" class="num-mono text-3xl sm:text-4xl font-black text-emerald-400">1,335.00</span>
                                     <span class="text-xs text-slate-400">TWD</span>
                                 </div>
                                 <div class="flex items-center justify-end gap-2 mt-1">
                                     <span class="px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-bold num-mono">
                                         外資持股 <span id="header-foreign-pct">64.82%</span>
                                     </span>
-                                    <span id="detail-change" class="num-mono text-sm font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">—</span>
+                                    <span id="detail-change" class="num-mono text-sm font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                                        ▼ 145.00 (-9.80%)
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -694,7 +695,6 @@
                             </div>
                             <div id="candle-detail-tooltip" class="hidden rounded-lg border border-indigo-500/40 bg-indigo-950/50 text-indigo-100 px-3 py-2 font-mono text-[11px] leading-relaxed" aria-live="polite"></div>
                             <div id="candle-lock-status" class="text-cyan-300 text-[11px]">移動滑鼠定位；單擊固定 K 棒；按 Esc 解除</div>
-                            <div id="candle-live-quote" class="text-[11px] text-cyan-300">最新可得股價尚未同步</div>
                             <div id="stockKChart" style="width:100%;height:430px" role="img" aria-label="真實歷史開盤、最高、最低、收盤 K 線圖"></div>
                             <div class="flex flex-col sm:flex-row justify-between gap-2 text-xs">
                                 <span id="candle-status" class="text-slate-400">等待載入官方歷史 K 線…</span>
@@ -706,46 +706,46 @@
                         <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-2 border-t border-slate-800 text-xs">
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">昨收價</span>
-                                <span id="detail-prev" class="num-mono font-bold text-slate-200">—</span>
+                                <span id="detail-prev" class="num-mono font-bold text-slate-200">1,480.00</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">開盤價</span>
-                                <span id="detail-open" class="num-mono font-bold text-emerald-400">—</span>
+                                <span id="detail-open" class="num-mono font-bold text-emerald-400">1,360.00</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">最高 / 最低</span>
-                                <span id="detail-hl" class="num-mono font-bold text-slate-200">—</span>
+                                <span id="detail-hl" class="num-mono font-bold text-slate-200">1,365 / 1,335</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">成交量 (張)</span>
-                                <span id="detail-vol" class="num-mono font-bold text-indigo-300">—</span>
+                                <span id="detail-vol" class="num-mono font-bold text-indigo-300">28,450</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg border border-cyan-500/25">
                                 <span class="text-cyan-300 block text-[10px]">外資持股比</span>
-                                <span id="detail-foreign-pct" class="num-mono font-bold text-cyan-400">—</span>
+                                <span id="detail-foreign-pct" class="num-mono font-bold text-cyan-400">64.82%</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">外資買賣超</span>
-                                <span id="detail-foreign-net" class="num-mono font-bold text-emerald-400">—</span>
+                                <span id="detail-foreign-net" class="num-mono font-bold text-emerald-400">-5,420 張</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">投信買賣超</span>
-                                <span id="detail-trust-net" class="num-mono font-bold text-red-400">—</span>
+                                <span id="detail-trust-net" class="num-mono font-bold text-red-400">+380 張</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">400張大戶比</span>
-                                <span id="detail-whale-pct" class="num-mono font-bold text-amber-300">—</span>
+                                <span id="detail-whale-pct" class="num-mono font-bold text-amber-300">78.40%</span>
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
                             <div class="bg-slate-900/70 p-2.5 rounded-lg flex items-center justify-between">
-                                <span class="text-slate-400">官方公告本益比 (P/E)：</span>
-                                <span id="detail-pe" class="num-mono font-bold text-amber-400">—</span>
+                                <span class="text-slate-400">2027E 預估本益比 (P/E)：</span>
+                                <span id="detail-pe" class="num-mono font-bold text-amber-400">28.7 倍</span>
                             </div>
                             <div class="bg-slate-900/70 p-2.5 rounded-lg flex items-center justify-between">
                                 <span class="text-slate-400">長線關鍵支撐位：</span>
-                                <span id="detail-support" class="num-mono font-bold text-emerald-300">—</span>
+                                <span id="detail-support" class="num-mono font-bold text-emerald-300">1,280 / 1,180 元</span>
                             </div>
                         </div>
                     </div>
@@ -993,15 +993,15 @@
                     <div>
                         <div class="flex items-center gap-2">
                             <span class="w-2.5 h-6 rounded-full bg-amber-400"></span>
-                            <h2 class="text-lg sm:text-xl font-bold text-white">長線價值推薦觀察清單 (1～3 年持有週期)</h2>
+                            <h2 class="text-lg sm:text-xl font-bold text-white">長線研究觀察清單（非投資推薦）</h2>
                         </div>
-                        <p class="text-xs text-slate-400 mt-0.5">嚴選外資高持股護城河穩固、受惠 AI 長線結構升級之核心標的</p>
+                        <p class="text-xs text-slate-400 mt-0.5">僅提供可查證行情與股票資料來源；不使用未同步的籌碼敘述作為買賣依據</p>
                     </div>
 
                     <div class="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800 self-start">
-                        <button onclick="filterRecommendations('ALL')" id="rec-filter-ALL" class="rec-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white transition">全部推薦 (6)</button>
+                        <button onclick="filterRecommendations('ALL')" id="rec-filter-ALL" class="rec-filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 text-white transition">全部觀察 (6)</button>
                         <button onclick="filterRecommendations('AI_CORE')" id="rec-filter-AI_CORE" class="rec-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">AI 算力與散熱</button>
-                        <button onclick="filterRecommendations('VALUE')" id="rec-filter-VALUE" class="rec-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">錯殺價值龍頭</button>
+                        <button onclick="filterRecommendations('VALUE')" id="rec-filter-VALUE" class="rec-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">其他大型權值</button>
                         <button onclick="filterRecommendations('ETF')" id="rec-filter-ETF" class="rec-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition">市值型 ETF</button>
                     </div>
                 </div>
@@ -1017,7 +1017,7 @@
                             <span class="w-2.5 h-6 rounded-full bg-emerald-400"></span>
                             <h2 class="text-lg sm:text-xl font-bold text-white">長線投資人「三階段分批建倉」零股試算器</h2>
                         </div>
-                        <p class="text-xs text-slate-400 mt-0.5">輸入預計投入的總資金，自動計算三階段買進股數與預期成本</p>
+                        <p class="text-xs text-slate-400 mt-0.5">輸入資金並以最新可得收盤／盤中參考價試算，非即時成交保證或買賣建議</p>
                     </div>
                     <button onclick="saveCurrentPlanToCloud()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 self-start">
                         <i class="fa-solid fa-floppy-disk"></i>
@@ -1058,15 +1058,15 @@
                         <div class="pt-3 border-t border-slate-800 space-y-1.5 text-xs">
                             <div class="flex justify-between">
                                 <span class="text-slate-400">三批合計可買零股：</span>
-                                <span id="calc-total-shares" class="num-mono font-bold text-white">242 股</span>
+                                <span id="calc-total-shares" class="num-mono font-bold text-white">—</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-slate-400">預估加權平均成本：</span>
-                                <span id="calc-avg-cost" class="num-mono font-bold text-emerald-400">1,231.50 元 / 股</span>
+                                <span id="calc-avg-cost" class="num-mono font-bold text-emerald-400">—</span>
                             </div>
                             <div class="flex justify-between">
-                                <span class="text-slate-400">回到目標價預估潛在報酬：</span>
-                                <span id="calc-target-profit" class="num-mono font-bold text-red-400">+36.4% (+NT$ 108,537)</span>
+                                <span class="text-slate-400">目標價與潛在報酬：</span>
+                                <span id="calc-target-profit" class="num-mono font-bold text-red-400">—</span>
                             </div>
                         </div>
                     </div>
@@ -1077,11 +1077,11 @@
                                 <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-xs font-bold">第一批：底倉 (20%)</span>
                                 <span class="num-mono text-xs text-slate-400">試水溫防踏空</span>
                             </div>
-                            <div id="stage1-price" class="num-mono text-xl font-black text-white my-1">1,310 元</div>
-                            <div class="text-[11px] text-slate-400 mb-3">建議掛單區間：早盤慣性開低釋放賣壓時</div>
+                            <div id="stage1-price" class="num-mono text-xl font-black text-white my-1">—</div>
+                            <div class="text-[11px] text-slate-400 mb-3">情境：第一批投入 20%，以最新可得價試算</div>
                             <div class="space-y-1 pt-2 border-t border-slate-800/80 text-xs">
-                                <div class="flex justify-between"><span class="text-slate-400">分配資金：</span><span id="stage1-amount" class="num-mono font-bold text-slate-200">NT$ 60,000</span></div>
-                                <div class="flex justify-between"><span class="text-slate-400">建議買進零股：</span><span id="stage1-shares" class="num-mono font-bold text-indigo-400">45 股</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">分配資金：</span><span id="stage1-amount" class="num-mono font-bold text-slate-200">—</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">預估可購零股：</span><span id="stage1-shares" class="num-mono font-bold text-indigo-400">—</span></div>
                             </div>
                         </div>
 
@@ -1090,11 +1090,11 @@
                                 <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-xs font-bold">第二批：甜蜜區 (40%)</span>
                                 <span class="num-mono text-xs text-emerald-400">主力低接部位</span>
                             </div>
-                            <div id="stage2-price" class="num-mono text-xl font-black text-emerald-300 my-1">1,180 元</div>
-                            <div class="text-[11px] text-slate-300 mb-3">建議掛單區間：回測年線/25倍P/E且連3日不破底</div>
+                            <div id="stage2-price" class="num-mono text-xl font-black text-emerald-300 my-1">—</div>
+                            <div class="text-[11px] text-slate-300 mb-3">情境：第二批投入 40%，以最新可得價試算</div>
                             <div class="space-y-1 pt-2 border-t border-slate-800/80 text-xs">
-                                <div class="flex justify-between"><span class="text-slate-400">分配資金：</span><span id="stage2-amount" class="num-mono font-bold text-slate-200">NT$ 120,000</span></div>
-                                <div class="flex justify-between"><span class="text-slate-400">建議買進零股：</span><span id="stage2-shares" class="num-mono font-bold text-emerald-400">101 股</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">分配資金：</span><span id="stage2-amount" class="num-mono font-bold text-slate-200">—</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">預估可購零股：</span><span id="stage2-shares" class="num-mono font-bold text-emerald-400">—</span></div>
                             </div>
                         </div>
 
@@ -1103,16 +1103,17 @@
                                 <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs font-bold">第三批：右側確認 (40%)</span>
                                 <span class="num-mono text-xs text-slate-400">趨勢轉強加碼</span>
                             </div>
-                            <div id="stage3-price" class="num-mono text-xl font-black text-white my-1">1,250 元</div>
-                            <div class="text-[11px] text-slate-400 mb-3">建議掛單區間：外資轉買且股價帶量站回 10 日線</div>
+                            <div id="stage3-price" class="num-mono text-xl font-black text-white my-1">—</div>
+                            <div class="text-[11px] text-slate-400 mb-3">情境：第三批投入 40%，以最新可得價試算</div>
                             <div class="space-y-1 pt-2 border-t border-slate-800/80 text-xs">
-                                <div class="flex justify-between"><span class="text-slate-400">分配資金：</span><span id="stage3-amount" class="num-mono font-bold text-slate-200">NT$ 120,000</span></div>
-                                <div class="flex justify-between"><span class="text-slate-400">建議買進零股：</span><span id="stage3-shares" class="num-mono font-bold text-amber-400">96 股</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">分配資金：</span><span id="stage3-amount" class="num-mono font-bold text-slate-200">—</span></div>
+                                <div class="flex justify-between"><span class="text-slate-400">預估可購零股：</span><span id="stage3-shares" class="num-mono font-bold text-amber-400">—</span></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                <p id="calculator-source-note" class="text-xs text-amber-300">等待官方行情載入後進行試算，三階段資金比例不代表買點建議。</p>
                 <div class="pt-4 border-t border-slate-800">
                     <div class="text-xs font-bold text-slate-400 mb-2">已儲存的建倉計畫紀錄</div>
                     <div id="saved-plans-list" class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs"></div>
@@ -1269,9 +1270,9 @@
         <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
             <div class="flex items-center gap-2">
                 <i class="fa-solid fa-scale-balanced text-slate-400"></i>
-                <span>免責聲明：串接 FinMind 台灣股市公開數據與 Gemini AI 每日自動更新日報，僅供投資研究與策略模擬參考。</span>
+                <span>免責聲明：TWSE／TPEx 公告資料與歷史日 K 不代表盤中逐筆報價；Gemini 研究報告須明確核對日期與來源。</span>
             </div>
-            <div class="num-mono whitespace-nowrap">TWSE Institutional Pro v2.1 • GIS Google Auth</div>
+            <div class="num-mono whitespace-nowrap">TWSE Pro v2.5 • TWSE / TPEx 日行情日期核對</div>
         </div>
     </footer>
 
@@ -1285,149 +1286,24 @@
          核心 JavaScript 邏輯
          ===================================================== -->
     <script>
-        const STOCK_DB = {
-            '2308': {
-                code: '2308', name: '台達電', category: 'AI電源與液冷散熱',
-                price: 1335.00, prevClose: 1480.00, open: 1360.00, high: 1365.00, low: 1335.00, volume: 28450,
-                isLimitDown: true, isLimitUp: false, dataSource: 'FinMind 真實同步',
-                foreignPct: 64.82, foreignShares: 1683420, foreign20dDiff: -0.65,
-                foreignNetToday: -5420, foreignNet5d: -12450, foreignNet20d: -16800,
-                trustPct: 6.25, trustNetToday: 380, trustNet5d: 1850, trustNet20d: 4620,
-                dealerNetToday: -890, dealerNet5d: -2150, dealerNet20d: -3400,
-                whale400Pct: 78.40, marginUsage: 4.85, marginChange: -620, shortBalance: 18420,
-                chipStreak: '外資持股 64.8% • 投信逆勢低接',
-                eps26: 37.1, eps27: 46.5, yield: '1.65%', fairRange: '1,150 ~ 1,300 元', targetPrice: 1680,
-                supportText: '1,280 元 (短撐) / 1,180 元 (年線甜蜜區)', rating: '長線左側分批買進', recType: 'VALUE',
-                desc: '全球伺服器電源與水冷散熱龍頭 • Q3 營收創高，短期受泰達電存貨跌價提列影響',
-                thesis: '泰達電提列 18 億泰銖存貨跌價損失屬 90 天庫齡會計規範，並非訂單消失。隨缺料緩解出貨，跌價損失將回沖拉升毛利率。',
-                stagePrices: [1310, 1180, 1250],
-                history1D: [1360, 1365, 1350, 1345, 1340, 1335, 1335, 1335, 1335, 1335, 1335, 1335],
-                history5D: [1620, 1590, 1545, 1510, 1480, 1335],
-                history1M: [2115, 2040, 1950, 1880, 1790, 1720, 1650, 1580, 1480, 1335],
-                history1MLabels: ['10/02', '10/06', '10/09', '10/13', '10/16', '10/20', '10/22', '10/26', '10/29', '10/30'],
-                history1Y: [1050, 1180, 1320, 1490, 1680, 1850, 2115, 1920, 1650, 1335],
-                foreignHist: [65.5, 65.4, 65.3, 65.2, 65.1, 65.0, 64.95, 64.9, 64.86, 64.82]
-            },
-            '2330': {
-                code: '2330', name: '台積電', category: '晶圓代工龍頭',
-                price: 2375.00, prevClose: 2420.00, open: 2385.00, high: 2395.00, low: 2365.00, volume: 46820,
-                isLimitDown: false, isLimitUp: false, dataSource: 'FinMind 真實同步',
-                foreignPct: 73.24, foreignShares: 18992400, foreign20dDiff: +0.42,
-                foreignNetToday: -14250, foreignNet5d: -8600, foreignNet20d: +42500,
-                trustPct: 4.10, trustNetToday: +1650, trustNet5d: +5420, trustNet20d: +14800,
-                dealerNetToday: -1320, dealerNet5d: -3100, dealerNet20d: -5200,
-                whale400Pct: 86.50, marginUsage: 1.42, marginChange: -310, shortBalance: 32500,
-                chipStreak: '外資高持股 73.2% • 投信連買',
-                eps26: 98.5, eps27: 122.0, yield: '1.85%', fairRange: '2,250 ~ 2,400 元', targetPrice: 2850,
-                supportText: '2,350 元 (季線) / 2,260 元 (波段強撐)', rating: '核心底倉首選', recType: 'AI_CORE',
-                desc: '全球先進製程與 CoWoS 封裝絕對壟斷者 • 外資持股逾 73% 最具共識核心資產',
-                thesis: '2 奈米與 A16 製程需求強勁，CoWoS 產能持續倍增。外資持股高達 73% 以上，對應 2027 年預估本益比僅約 19.4 倍。',
-                stagePrices: [2370, 2280, 2410],
-                history1D: [2385, 2395, 2390, 2380, 2370, 2365, 2375, 2380, 2370, 2375, 2372, 2375],
-                history5D: [2490, 2475, 2450, 2435, 2420, 2375],
-                history1M: [2580, 2540, 2510, 2490, 2460, 2485, 2450, 2430, 2420, 2375],
-                history1MLabels: ['10/02', '10/06', '10/09', '10/13', '10/16', '10/20', '10/22', '10/26', '10/29', '10/30'],
-                history1Y: [1650, 1780, 1920, 2050, 2180, 2350, 2580, 2490, 2420, 2375],
-                foreignHist: [72.8, 72.9, 73.0, 73.1, 73.15, 73.2, 73.3, 73.28, 73.26, 73.24]
-            },
-            '2454': {
-                code: '2454', name: '聯發科', category: 'IC 設計 / AI ASIC',
-                price: 3865.00, prevClose: 4065.00, open: 3940.00, high: 3955.00, low: 3850.00, volume: 9420,
-                isLimitDown: false, isLimitUp: false, dataSource: 'FinMind 真實同步',
-                foreignPct: 58.65, foreignShares: 938400, foreign20dDiff: -0.30,
-                foreignNetToday: -2180, foreignNet5d: -4120, foreignNet20d: -4800,
-                trustPct: 7.80, trustNetToday: +420, trustNet5d: +1950, trustNet20d: +5200,
-                dealerNetToday: -340, dealerNet5d: -890, dealerNet20d: -1450,
-                whale400Pct: 74.20, marginUsage: 3.60, marginChange: -185, shortBalance: 8920,
-                chipStreak: '外資短線調節 • 投信連 5 買',
-                eps26: 162.0, eps27: 195.0, yield: '3.10%', fairRange: '3,650 ~ 3,900 元', targetPrice: 4600,
-                supportText: '3,800 元 (整數關卡) / 3,650 元 (半年線)', rating: '拉回分批佈局', recType: 'AI_CORE',
-                desc: '邊緣 AI 旗艦手機晶片與雲端 AI ASIC 雙引擎驅動 • 外資持股近 59%',
-                thesis: '天璣旗艦晶片市占穩步擴張，雲端 CSP 客戶 AI ASIC 專案於 2027 年進入量產認列高峰。',
-                stagePrices: [3850, 3680, 3920],
-                history1D: [3940, 3955, 3920, 3890, 3875, 3860, 3850, 3870, 3860, 3865, 3862, 3865],
-                history5D: [4180, 4150, 4110, 4090, 4065, 3865],
-                history1M: [4350, 4280, 4210, 4190, 4150, 4120, 4090, 4065, 3980, 3865],
-                history1MLabels: ['10/02', '10/06', '10/09', '10/13', '10/16', '10/20', '10/22', '10/26', '10/29', '10/30'],
-                history1Y: [2650, 2890, 3150, 3420, 3780, 4120, 4350, 4180, 4065, 3865],
-                foreignHist: [58.9, 58.85, 58.8, 58.82, 58.78, 58.75, 58.72, 58.70, 58.68, 58.65]
-            },
-            '3017': {
-                code: '3017', name: '奇鋐', category: 'AI 水冷散熱',
-                price: 2980.00, prevClose: 3150.00, open: 3040.00, high: 3065.00, low: 2960.00, volume: 14230,
-                isLimitDown: false, isLimitUp: false, dataSource: 'FinMind 真實同步',
-                foreignPct: 48.35, foreignShares: 185200, foreign20dDiff: +1.85,
-                foreignNetToday: -680, foreignNet5d: +1420, foreignNet20d: +7250,
-                trustPct: 12.40, trustNetToday: +290, trustNet5d: +1680, trustNet20d: +4120,
-                dealerNetToday: -150, dealerNet5d: -320, dealerNet20d: -480,
-                whale400Pct: 69.80, marginUsage: 14.20, marginChange: -450, shortBalance: 6420,
-                chipStreak: '投信高持股 12.4% 鎖碼股',
-                eps26: 92.0, eps27: 125.0, yield: '1.20%', fairRange: '2,750 ~ 3,000 元', targetPrice: 3650,
-                supportText: '2,900 元 / 2,750 元 (季線支撐)', rating: '趨勢成長配置', recType: 'AI_CORE',
-                desc: 'CSP 大廠水冷板 (Cold Plate) 與 CDU 主力供應商 • 外資與投信合計鎖碼逾 60%',
-                thesis: 'AI 伺服器全面轉向全液冷架構，奇鋐在水冷板與快接頭良率領先同業，隨大盤修正拉回具長線吸引力。',
-                stagePrices: [2960, 2780, 3050],
-                history1D: [3040, 3065, 3030, 3010, 2990, 2960, 2975, 2985, 2970, 2980, 2978, 2980],
-                history5D: [3290, 3240, 3210, 3180, 3150, 2980],
-                history1M: [3480, 3410, 3350, 3290, 3250, 3210, 3180, 3150, 3080, 2980],
-                history1MLabels: ['10/02', '10/06', '10/09', '10/13', '10/16', '10/20', '10/22', '10/26', '10/29', '10/30'],
-                history1Y: [1850, 2100, 2450, 2780, 3120, 3480, 3350, 3210, 3150, 2980],
-                foreignHist: [46.5, 46.8, 47.1, 47.4, 47.8, 48.0, 48.2, 48.3, 48.38, 48.35]
-            },
-            '2317': {
-                code: '2317', name: '鴻海', category: 'AI 伺服器系統組裝',
-                price: 285.00, prevClose: 296.50, open: 289.00, high: 290.50, low: 283.50, volume: 89540,
-                isLimitDown: false, isLimitUp: false, dataSource: 'FinMind 真實同步',
-                foreignPct: 43.18, foreignShares: 5984000, foreign20dDiff: +0.92,
-                foreignNetToday: -18500, foreignNet5d: -12400, foreignNet20d: +85600,
-                trustPct: 5.40, trustNetToday: +2450, trustNet5d: +8900, trustNet20d: +24500,
-                dealerNetToday: -2100, dealerNet5d: -4500, dealerNet20d: -6800,
-                whale400Pct: 68.90, marginUsage: 6.40, marginChange: -1250, shortBalance: 65400,
-                chipStreak: '投信連 10 日買超護盤',
-                eps26: 16.8, eps27: 20.5, yield: '3.50%', fairRange: '265 ~ 285 元', targetPrice: 345,
-                supportText: '280 元 / 268 元 (半年線支撐)', rating: '波段/長線價值', recType: 'VALUE',
-                desc: '全球最大 AI 伺服器機櫃整合廠 • 本益比僅 13.9 倍且外資近月大買逾 8.5 萬張',
-                thesis: 'AI 伺服器機櫃出貨量持續放大，佔整體營收比重突破 45%。目前股價對應 2027E 本益比僅 13.9 倍。',
-                stagePrices: [284, 270, 292],
-                history1D: [289, 290.5, 288, 286.5, 285, 283.5, 284.5, 285.5, 284, 285, 284.5, 285],
-                history5D: [305, 302, 299, 298, 296.5, 285],
-                history1M: [318, 312, 308, 305, 301, 299, 296.5, 292, 289, 285],
-                history1MLabels: ['10/02', '10/06', '10/09', '10/13', '10/16', '10/20', '10/22', '10/26', '10/29', '10/30'],
-                history1Y: [195, 215, 238, 265, 290, 318, 308, 298, 296.5, 285],
-                foreignHist: [42.2, 42.4, 42.6, 42.8, 43.0, 43.1, 43.25, 43.22, 43.20, 43.18]
-            },
-            '0050': {
-                code: '0050', name: '元大台灣50', category: '市值型龍頭 ETF',
-                price: 268.50, prevClose: 277.20, open: 270.00, high: 271.20, low: 267.40, volume: 62300,
-                isLimitDown: false, isLimitUp: false, dataSource: 'FinMind 真實同步',
-                foreignPct: 18.40, foreignShares: 495000, foreign20dDiff: -0.20,
-                foreignNetToday: -8900, foreignNet5d: -14500, foreignNet20d: -12000,
-                trustPct: 3.50, trustNetToday: +3200, trustNet5d: +9800, trustNet20d: +18500,
-                dealerNetToday: -4500, dealerNet5d: -8200, dealerNet20d: -11000,
-                whale400Pct: 62.40, marginUsage: 2.10, marginChange: +420, shortBalance: 5400,
-                chipStreak: '官股與內資逢大跌大舉申購',
-                eps26: 12.5, eps27: 15.2, yield: '2.95%', fairRange: '255 ~ 270 元', targetPrice: 315,
-                supportText: '265 元 (半年線) / 252 元 (年線)', rating: '大盤重挫首選加碼', recType: 'ETF',
-                desc: '一籃子買進台灣前 50 大外資核心權值股 • 大盤單日大跌時最佳被動工具',
-                thesis: '當台股重挫回測半年線時，分批買進 0050 持有 1 年以上之正報酬勝率極高，免除單一個股財報波動風險。',
-                stagePrices: [268, 256, 274],
-                history1D: [270, 271.2, 269.8, 269, 268.2, 267.4, 268, 268.8, 268.1, 268.5, 268.3, 268.5],
-                history5D: [284, 282, 280, 278.5, 277.2, 268.5],
-                history1M: [292, 289, 286, 284, 281, 279, 277.2, 274, 271, 268.5],
-                history1MLabels: ['10/02', '10/06', '10/09', '10/13', '10/16', '10/20', '10/22', '10/26', '10/29', '10/30'],
-                history1Y: [198, 215, 232, 248, 265, 282, 292, 284, 277.2, 268.5],
-                foreignHist: [18.6, 18.6, 18.55, 18.5, 18.5, 18.48, 18.45, 18.42, 18.41, 18.40]
-            }
-        };
+        // No bundled example quotes: all prices come from documented market APIs.
+        const STOCK_DB = Object.fromEntries([
+            ['2308','台達電'],['2330','台積電'],['2454','聯發科'],
+            ['3017','奇鋐'],['2317','鴻海'],['0050','元大台灣50']
+        ].map(([code,name])=>[code,{
+            code,name,category:'待分類',price:0,prevClose:0,open:0,high:0,low:0,volume:0,
+            foreignPct:0,foreignNetToday:0,trustNetToday:0,dealerNetToday:0,foreignShares:0,
+            foreign20dDiff:0,foreignNet5d:0,trustNet5d:0,whale400Pct:0,marginUsage:0,
+            chipStreak:'資料未同步',targetPrice:0,eps26:0,eps27:0,
+            yield:'—',fairRange:'—',supportText:'—',rating:'觀察',recType:'NONE',
+            desc:'待官方資料驗證',thesis:'未取得資料前不提供具體買賣建議',
+            stagePrices:[0,0,0],history1D:[],history5D:[],history1M:[],history1Y:[],foreignHist:[]
+        }]));
 
         const EXTRA_TW_NAMES = {
-            '3008': { name: '大立光', cat: '光學鏡頭龍頭', base: 2680.0, fPct: 38.9 },
-            '2881': { name: '富邦金', cat: '金控獲利龍頭', base: 94.8, fPct: 21.45 },
-            '00878': { name: '國泰永續高股息', cat: '高股息防禦 ETF', base: 24.55, fPct: 4.2 },
-            '2303': { name: '聯電', cat: '成熟製程晶圓代工', base: 51.5, fPct: 34.5 },
-            '3324': { name: '雙鴻', cat: 'AI 水冷散熱', base: 1420.0, fPct: 28.6 },
-            '6669': { name: '緯穎', cat: '雲端伺服器品牌', base: 3480.0, fPct: 42.1 },
-            '2345': { name: '智邦', cat: '800G 網通交換器', base: 1125.0, fPct: 56.4 }
+            '3008':{name:'大立光'}, '2881':{name:'富邦金'},
+            '00878':{name:'國泰永續高股息'}, '2303':{name:'聯電'},
+            '3324':{name:'雙鴻'}, '6669':{name:'緯穎'}, '2345':{name:'智邦'}
         };
 
         const ADMIN_EMAIL = '034sean0804@gmail.com';
@@ -1449,25 +1325,22 @@
         let countdownSeconds = 30;
         let autoRefreshEnabled = true;
         let timerInterval = null;
-        // TAIEX prices are read from /api/summary; no demo index is stored.
+        let taiexState = { price: 0, prevClose: 0, volumeBillion: 0 };
 
-        // Unverified demo analysis must never masquerade as today's AI-generated report.
+        // 全市場宏觀與多檔焦點股 AI 每日自動日報預設範本
         const DEFAULT_MARKET_AI_REPORT = {
-            date: '—', generatedAt: '尚未產生 AI 報告（無官方資料推論）',
-            marketTitle: '尚未產生今日 AI 分析報告',
-            strategyFooter: '僅以官方已公告行情及提供的資料進行分析；未核實的籌碼數據不得推測。',
+            date: '未產生', generatedAt: '尚未生成當日 Gemini 日報',
+            marketTitle: '尚無已驗證的當日 AI 日報',
+            strategyFooter: '請先同步當日行情，再由已授權的管理員生成新報告。未經驗證的舊觀點不代表當日盤勢。',
             drivers: [
-                { title: '市場行情', color: 'red', detail: '請先同步官方資料；未成功呼叫 Gemini 前，不顯示假設的市場結論。' },
-                { title: '法人與籌碼', color: 'amber', detail: '尚未取得可驗證的法人交易明細，暫不提供買賣超推論。' },
-                { title: 'AI 分析', color: 'emerald', detail: '登入授權後可使用 AI 日報功能。請注意模型配額與資料日期。' }
+                {title:'行情資料來源', color:'amber', detail:'本區等待完成 Gemini 分析；最新價格請以股價表格所附交易日為準。'},
+                {title:'法人與籌碼', color:'amber', detail:'尚未取得經驗證的當日法人或大戶數據；不推測買賣超。'},
+                {title:'使用方式', color:'emerald', detail:'請先同步上市／上櫃行情。日報生成成功後才更新此區。'}
             ],
-            spotlightBadge: '尚未生成 AI 日報',
-            spotlightTitle: '四檔焦點股的價格由官方行情同步；分析內容須另外生成',
-            spotlightLeftTitle: '台積電 (2330) 與聯發科 (2454)',
-            spotlightLeftPoints: ['行情請以上方資料來源與交易日期為準。'],
-            spotlightRightTitle: '台達電 (2308) 與鴻海 (2317)',
-            spotlightRightPoints: ['無可靠資料時不提供估值或買賣建議。'],
-            sources: []
+            spotlightBadge: '尚未生成', spotlightTitle: '等候今日 AI 日報',
+            spotlightLeftTitle: '資料一致性', spotlightLeftPoints:['價格、日期、來源應相互對應。','未同步數字一律顯示 —。'],
+            spotlightRightTitle: '分析限制', spotlightRightPoints:['投資資訊僅供研究。','AI 不應創造缺失的即時股價或法人交易。'],
+            sources: [], isPlaceholder: true
         };
 
         let aiReportsHistory = [DEFAULT_MARKET_AI_REPORT];
@@ -1519,8 +1392,8 @@
             if (loginGate) loginGate.classList.toggle('hidden', loggedIn || guestModeActive);
             if (banner) banner.classList.remove('hidden');
             if (bannerText) bannerText.textContent = loggedIn
-                ? `已使用 Google 登入：${userState.displayName || currentGoogleEmail}｜個人資料保存在這個瀏覽器；部分大盤卡片／預設報告是範例，非即時行情`
-                : '訪客唯讀｜可看官方市場表格與 K 線。注意：部分大盤卡片與預設 AI 報告是示範內容；收藏與儲存需 Google 登入。';
+                ? `已使用 Google 登入：${userState.displayName || currentGoogleEmail}｜個人資料保存在此瀏覽器；行情以各欄資料日與來源為準`
+                : '訪客唯讀｜可查官方股價、K 線與資料日期；當日 AI 報告尚未生成時會顯示佔位說明，收藏與儲存需 Google 登入。';
             if (bannerButton) bannerButton.classList.toggle('hidden', loggedIn);
             if (adminBtn) { adminBtn.classList.toggle('hidden', !isAdminUser()); adminBtn.classList.toggle('flex', isAdminUser()); }
             if (crownBadge) crownBadge.classList.toggle('hidden', !isAdminUser());
@@ -1793,6 +1666,7 @@
 
         async function fetchRealStockDataFromFinMind(code) {
             const stock = getOrCreateStock(code);
+            if(!stock) { showToast('請先從官方股票清單選擇代號，沒有資料不會產生模擬股價'); return; }
             const startDate = getDateNDaysAgo(30);
             const priceRows = await fetchFinMindDataset('TaiwanStockPrice', code, startDate);
             if (!Array.isArray(priceRows) || priceRows.length < 2) {
@@ -2059,9 +1933,10 @@
         }
         function renderAiDailyReportSection() {
             const report = aiReportsHistory[activeReportIndex] || DEFAULT_MARKET_AI_REPORT;
-            document.getElementById('report-date-badge').textContent = `目前報告日期：${report.date}`;
+            document.getElementById('report-date-badge').textContent = `報告日期：${report.date || '未提供'}${report.isPlaceholder ? ' · 尚未生成' : ''}`;
             document.getElementById('ai-market-title').textContent = report.marketTitle;
-            document.getElementById('ai-report-timestamp').textContent = report.generatedAt;
+            document.getElementById('ai-report-timestamp').textContent =
+                report.generatedAt + (report.isPlaceholder || !(Array.isArray(report.sources) && report.sources.length) ? ' · 尚無可驗證來源' : '');
             document.getElementById('ai-market-strategy-footer').innerHTML = `<i class="fa-solid fa-shield-halved text-indigo-400 mr-1"></i>${safeReportText(report.strategyFooter)}`;
 
             const colorMap = { red: 'text-red-400 bg-red-500/20', amber: 'text-amber-400 bg-amber-500/20', emerald: 'text-emerald-400 bg-emerald-500/20' };
@@ -2110,35 +1985,10 @@
 
         // 股票查詢、圖表、自選股邏輯
         function getOrCreateStock(query) {
-            const clean = String(query).trim().toUpperCase();
+            const clean=String(query||'').trim().toUpperCase();
             if (STOCK_DB[clean]) return STOCK_DB[clean];
-            for (const c in STOCK_DB) if (STOCK_DB[c].name.includes(clean)) return STOCK_DB[c];
-            if (EXTRA_TW_NAMES[clean]) {
-                const info = EXTRA_TW_NAMES[clean];
-                STOCK_DB[clean] = {
-                    code: clean, name: info.name, category: info.cat,
-                    price: info.base, prevClose: info.base * 1.02, open: info.base * 1.01, high: info.base * 1.03, low: info.base * 0.99, volume: 15000,
-                    isLimitDown: false, isLimitUp: false, dataSource: 'FinMind 快取',
-                    foreignPct: info.fPct, foreignShares: 500000, foreign20dDiff: 0.2,
-                    foreignNetToday: 120, foreignNet5d: 500, foreignNet20d: 1200,
-                    trustPct: 3.2, trustNetToday: 80, trustNet5d: 300, trustNet20d: 800,
-                    dealerNetToday: -20, dealerNet5d: -80, dealerNet20d: -150,
-                    whale400Pct: 70.0, marginUsage: 5.0, marginChange: -10, shortBalance: 2000,
-                    chipStreak: `外資持股 ${info.fPct}%`, eps26: 15.0, eps27: 18.5, yield: '2.5%',
-                    fairRange: `${(info.base*0.9).toFixed(1)} ~ ${(info.base*1.05).toFixed(1)} 元`,
-                    targetPrice: info.base * 1.25, supportText: '月線支撐', rating: '長線觀察', recType: 'NONE',
-                    desc: `${info.cat}`, thesis: `${info.name} 營運穩健。`,
-                    stagePrices: [info.base*0.98, info.base*0.9, info.base*0.95],
-                    history1D: [info.base*0.99, info.base, info.base],
-                    history5D: [info.base*0.97, info.base*0.98, info.base],
-                    history1M: [info.base*0.95, info.base*0.97, info.base],
-                    history1MLabels: ['10/02','10/09','10/16','10/23','10/30'],
-                    history1Y: [info.base*0.8, info.base*0.9, info.base],
-                    foreignHist: [info.fPct, info.fPct]
-                };
-                return STOCK_DB[clean];
-            }
-            return STOCK_DB['2308'];
+            const named=Object.values(STOCK_DB).find(s=>s.name===clean);
+            return named||null; // Never synthesize a market quote from an arbitrary base price.
         }
 
         function formatNumber(num, decimals = 2) {
