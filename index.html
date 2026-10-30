@@ -281,6 +281,7 @@
         </div>
     </div>
 
+    <div class="max-w-7xl mx-auto w-full px-4 py-1 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-sky-400"></i><span id="quote-sync-status" class="text-xs text-slate-400">行情：正在確認交易時段及來源；盤後與盤中參考資料會分開標示</span></div>
     <!-- 主內容容器 -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
 
@@ -691,6 +692,8 @@
                                 <span id="candle-ohlc" class="font-mono text-slate-300">滑鼠移到 K 線可查看開高低收</span>
                                 <span class="text-amber-300 text-[11px]">台股紅漲／綠跌 · MA5 黃線 · MA20 藍線</span>
                             </div>
+                            <div id="candle-detail-tooltip" class="hidden rounded-lg border border-indigo-500/40 bg-indigo-950/50 text-indigo-100 px-3 py-2 font-mono text-[11px] leading-relaxed" aria-live="polite"></div>
+                            <div id="candle-lock-status" class="text-cyan-300 text-[11px]">移動滑鼠定位；單擊固定 K 棒；按 Esc 解除</div>
                             <div id="stockKChart" style="width:100%;height:430px" role="img" aria-label="真實歷史開盤、最高、最低、收盤 K 線圖"></div>
                             <div class="flex flex-col sm:flex-row justify-between gap-2 text-xs">
                                 <span id="candle-status" class="text-slate-400">等待載入官方歷史 K 線…</span>
@@ -1912,25 +1915,36 @@
             const endpoint = (apiBase || '') + '/api/ai/generate';
             if (deployed || !apiSettings.customGeminiKey) {
                 const token = sessionStorage.getItem('TWSE_GOOGLE_ID_TOKEN');
-                const controller = new AbortController();
-                const timeout = setTimeout(()=>controller.abort(),55000);
-                try {
-                    const res = await fetch(endpoint, {method:'POST',cache:'no-store',signal:controller.signal,
-                        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-                        body:JSON.stringify({prompt,systemPrompt})});
-                    const result = await res.json().catch(()=>({}));
-                    if (!res.ok) throw new Error(result.error || `後端 AI HTTP ${res.status}`);
-                    if (!result.result || typeof result.result!=='object') throw new Error('後端 AI 回傳格式錯誤');
-                    return result.result;
-                } catch(err) {
-                    if(err.name==='AbortError') throw new Error('AI 生成逾時，請稍後再試');
-                    throw err;
-                } finally {clearTimeout(timeout);}
+                let lastError;
+                for(let attempt=0;attempt<2;attempt++) {
+                    const controller=new AbortController();
+                    const timeout=setTimeout(()=>controller.abort(), attempt===0?95000:70000);
+                    try {
+                        const res=await fetch(endpoint,{method:'POST',cache:'no-store',signal:controller.signal,
+                            headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+                            body:JSON.stringify({prompt,systemPrompt})});
+                        const result=await res.json().catch(()=>({}));
+                        if(!res.ok){
+                            const err=new Error(result.error || `後端 AI HTTP ${res.status}`);
+                            err.status=res.status;throw err;
+                        }
+                        if(!result.result||typeof result.result!=='object')throw new Error('後端 AI 回傳格式錯誤');
+                        return result.result;
+                    }catch(err){
+                        lastError=err.name==='AbortError'?new Error('AI 請求逾時，可能是 Render 喚醒或 Gemini 回應較慢'):err;
+                        // Retry once for transient network failures only; 429 is rate-limited by the backend.
+                        if(attempt===0 && (err.name==='AbortError'||err.status===502||err.status===503||err.status===504)){
+                            await new Promise(r=>setTimeout(r,1600));continue;
+                        }
+                        throw lastError;
+                    }finally{clearTimeout(timeout);}
+                }
+                throw lastError||new Error('AI 生成失敗');
             }
             const key = (apiSettings.customGeminiKey || '').trim();
             if (!key) throw new Error('尚未設定 Gemini API Key，請至管理員的「API 與協作平台發布設定」填入金鑰。');
             if (!navigator.onLine) throw new Error('目前裝置離線，無法呼叫 Gemini API。');
-            const models = ['gemini-3-flash-preview', 'gemini-2.5-flash'];
+            const models = ['gemini-3.8-flash', 'gemini-3-flash-preview'];
             let lastError;
             for (const model of models) {
                 for (let attempt = 0; attempt < 2; attempt++) {
@@ -1987,7 +2001,7 @@
             if (btn) btn.disabled = true;
             if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
             if (loadingBar) loadingBar.classList.remove('hidden');
-            if (loadingText) loadingText.textContent = '正在同步市場資料並呼叫 Gemini…';
+            if (loadingText) loadingText.textContent = '正在整理市場資料，Gemini 生成可能需要較長時間；請勿重複點擊…';
             try {
                 await syncAllRealFinMindData(false);
                 const todayStr = getTodayIsoDate();
