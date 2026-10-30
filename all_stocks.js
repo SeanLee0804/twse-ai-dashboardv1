@@ -6,15 +6,17 @@ const safeText = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<
 const number = (v, digits = 2) => v == null || !Number.isFinite(Number(v)) ? '—' : Number(v).toLocaleString('zh-TW',{maximumFractionDigits:digits,minimumFractionDigits:digits});
 const API_BASE = String(window.TWSE_PUBLIC_CONFIG?.apiBaseUrl || '').trim().replace(/\/$/, '');
 const apiUrl = path => API_BASE ? API_BASE + path : path;
+const LIVE_REFRESH_MS = 15000;
+let liveTimer = null;
+const lastQuoteDates = new Map();
+const pinned = { time: null, close: null };
 const K_RANGES = {'1D':'5D','5D':'5D','1M':'1M','3M':'3M','6M':'6M','1Y':'1Y'};
-window.getRealMarketAiContext=()=>['2308','2330','2454','3017','2317','0050'].map(code=>model.map.get(code)).filter(x=>x && x.price!=null).map(x=>({code:x.code,name:x.name,price:x.price,change:x.change,date:x.date,source:x.source}));
 const model = { market: [], map: new Map(), marketStatus: '載入中', query:'', kind:'ALL', page:1, pageSize:40,
    sort:'code', chart:null, candleSeries:null, volSeries:null, ma5:null, ma20:null,
    candleCache:new Map(), activeSeq:0, lastCandles:[], selectedRange:'3M', showMA:true, showVolume:true,
    chartObserver:null, loadingMarket:null, loadingChart:false, status:'', backendOk:false };
 const localFetch = async (url, options={}) => {
-   if (!API_BASE && location.hostname.endsWith('.github.io')) throw new Error('尚未設定雲端股票 API，請先部署 Render 並在 api-config.js 填入網址');
-   const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),22000);
+   const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),35000);
    try {
      const r=await fetch(apiUrl(url),{cache:'no-store',signal:ctl.signal,...options});
      let json; try{json=await r.json();}catch(_){ throw new Error('資料來源未回傳 JSON'); }
@@ -76,7 +78,7 @@ async function loadUniverse(refresh=false){
    }catch(err){
      model.backendOk=false;
      model.marketStatus=`全市場名單載入失敗：${err.message}`;
-     if(info) info.textContent=model.marketStatus + '。GitHub Pages 必須先在 api-config.js 設定已部署的 Python API 網址。' ;
+     if(info) info.textContent=model.marketStatus + '。請用 start.bat 啟動網站，勿使用 py -m http.server。';
      updateFinMindStatusUI(false,'股票資料服務未連線');
      renderEnhancedTable();
      return false;
@@ -93,6 +95,57 @@ window.fetchRealStockDataFromFinMind=async function(code){
  const item=model.map.get(String(code));if(!item)throw new Error(`${code} 未出現在最新名單`);
  ingest(item);return true;
 };
+function quoteStatus(message, tone='text-slate-400') {
+  const el=$('quote-sync-status');
+  if(!el)return;
+  el.className='text-xs '+tone;
+  el.textContent=message;
+}
+function getQuoteCodes(){
+  const ids=[currentStockCode,...(userState?.starredCodes||[])];
+  return [...new Set(ids.filter(x=>/^(?:\d{4}|00\d{3,4})$/.test(String(x))))].slice(0,12);
+}
+async function refreshIntradayQuotes(){
+  if(!model.backendOk || document.hidden || !navigator.onLine)return;
+  const codes=getQuoteCodes();if(!codes.length)return;
+  try{
+    const result=await localFetch('/api/quotes?codes='+encodeURIComponent(codes.join(',')));
+    if(result.status==='market_closed'){
+      quoteStatus('非盤中：顯示 TWSE／TPEx 官方盤後資料','text-slate-400');return;
+    }
+    if(result.status!=='intraday_reference' || !result.quotes?.length){
+      quoteStatus(result.message || '無新盤中行情，保留官方盤後資料','text-amber-300');return;
+    }
+    let changed=false;
+    for(const q of result.quotes){
+      const prev=lastQuoteDates.get(q.code);
+      if(prev && q.asOf<=prev)continue;
+      if(!model.map.has(q.code) || !(Number(q.price)>0))continue;
+      const v=model.map.get(q.code);
+      v.price=Number(q.price);v.prevClose=q.prevClose;
+      v.change=q.change;v.source=q.source;v.asOf=q.asOf;
+      v.date=q.date;v.quality=q.quality;
+      const stock=STOCK_DB[q.code];
+      if(stock){stock.price=v.price; stock.prevClose=q.prevClose||0; stock.dataSource=q.source;}
+      lastQuoteDates.set(q.code,q.asOf);
+      changed=true;
+    }
+    if(changed){
+      refreshFocusCards();renderTickerTapeAndPills();renderEnhancedTable();renderWatchlistPage();
+      updateSelectedDetails(currentStockCode);
+    }
+    const mostRecent=result.quotes.map(q=>q.asOf).filter(Boolean).sort().at(-1);
+    quoteStatus('盤中參考（非逐筆即時）· '+(mostRecent||'時間未知')+' · 15秒輪詢','text-cyan-300');
+  }catch(err){
+    quoteStatus('盤中資料暫無法更新：'+err.message+'；保留盤後資料','text-amber-300');
+  }
+}
+function startQuotePolling(){
+  if(liveTimer)clearInterval(liveTimer);
+  liveTimer=setInterval(refreshIntradayQuotes,LIVE_REFRESH_MS);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshIntradayQuotes();});
+  refreshIntradayQuotes();
+}
 function refreshFocusCards(){
  for(const code of ['2308','2330']){
    const item=model.map.get(code);if(!item)continue;
@@ -131,7 +184,7 @@ function renderEnhancedTable(){
    const pct=diff!==null && prev>0 ? `${(diff/prev*100).toFixed(2)}%`:'—';
    const cls=diff===null?'text-slate-400':diff>0?'text-red-400':diff<0?'text-emerald-400':'text-slate-300';
    return `<tr data-stock="${safeText(x.code)}" class="hover:bg-slate-800/60 cursor-pointer transition border-b border-slate-800/50">
-     <td class="py-3 px-3 text-center"><button data-star="${safeText(x.code)}" title="登入後才能儲存自選股" class="text-amber-400">${isStarred(x.code)?'★':'☆'}</button></td>
+     <td class="py-3 px-3 text-center"><button data-star="${safeText(x.code)}" title="切換自選" class="text-amber-400">${isStarred(x.code)?'★':'☆'}</button></td>
      <td class="py-3 px-3"><strong>${safeText(x.code)}</strong> <span class="text-slate-200">${safeText(x.name)}</span><div class="text-[10px] text-slate-500">${safeText(x.market)} · ${safeText(x.type)}</div></td>
      <td class="py-3 px-3 text-right num-mono font-bold ${cls}">${number(x.price)}</td>
      <td class="py-3 px-3 text-right num-mono ${cls}">${pct}</td>
@@ -238,7 +291,7 @@ async function loadCandles(){
  }
  model.lastCandles=[];drawChart();setChartStatus(`正在取得 ${code} 的 ${range} 歷史日 K 線…`);
  try{
-    const body={code,range}; // Never send browser-stored FinMind secrets to a remote public server.
+   const body={code,range}; // Never transmit browser-held FinMind secrets to a public API.
    const result=await localFetch('/api/candles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
    if(seq!==model.activeSeq)return;
    if(!result.candles?.length){model.lastCandles=[];drawChart();setChartStatus(result.message||`無法取得 ${code} 的 K 線；請確認 API 額度。`,true);return;}
@@ -248,7 +301,7 @@ async function loadCandles(){
    drawChart();
  }catch(err){
    if(seq!==model.activeSeq)return;
-   model.lastCandles=[];drawChart();setChartStatus(`K 線載入失敗：${err.message}。請確認雲端 API 或本機 server.py 已啟動。`,true);
+   model.lastCandles=[];drawChart();setChartStatus(`K 線載入失敗：${err.message}。請確認 server.py 已啟動。`,true);
  }
 }
 function ensureChart(){
@@ -267,11 +320,40 @@ function ensureChart(){
  model.ma20=model.chart.addSeries(l.LineSeries,{color:'#38bdf8',lineWidth:1.4,lastValueVisible:false,priceLineVisible:false});
  model.volSeries=model.chart.addSeries(l.HistogramSeries,{priceFormat:{type:'volume'},priceScaleId:'',lastValueVisible:false,priceLineVisible:false});
  model.volSeries.priceScale().applyOptions({scaleMargins:{top:.78,bottom:0}});
+ function showCandleInfo(time, point, locked=false){
+   const x=$('candle-ohlc'), panel=$('candle-detail-tooltip');
+   if(!point||!time){if(!pinned.time && x)x.textContent='滑鼠移到 K 線查看；點一下可固定，按 Esc 解除'; if(panel&&!locked&&!pinned.time)panel.classList.add('hidden');return;}
+   const key=typeof time==='string'?time:(time.year?`${time.year}-${String(time.month).padStart(2,'0')}-${String(time.day).padStart(2,'0')}`:String(time));
+   const i=model.lastCandles.findIndex(r=>r.time===key), bar=i<0?null:model.lastCandles[i];
+   if(x)x.textContent=`${locked?'已鎖定 • ':''}${key}　開 ${number(point.open)}　高 ${number(point.high)}　低 ${number(point.low)}　收 ${number(point.close)}`;
+   if(panel){
+     panel.classList.remove('hidden');
+     const change=bar&&i>0?bar.close-model.lastCandles[i-1].close:null;
+     panel.textContent=`${locked?'📌 已固定 · ':''}${key}  開 ${number(point.open)}  高 ${number(point.high)}  低 ${number(point.low)}  收 ${number(point.close)}  量 ${number(bar?.volume,0)} 股  漲跌 ${change==null?'—':(change>0?'+':'')+number(change)}`;
+   }
+ }
+ function releasePinned(){
+   pinned.time=null;pinned.close=null;
+   if(model.chart.clearCrosshairPosition)model.chart.clearCrosshairPosition();
+   $('candle-detail-tooltip')?.classList.add('hidden');
+   const status=$('candle-lock-status');if(status)status.textContent='移動滑鼠定位；單擊固定 K 棒';
+ }
  model.chart.subscribeCrosshairMove(param=>{
-    const point=param.seriesData?.get(model.candleSeries);
-    const x=$('candle-ohlc');
-    if(x){x.textContent=point ? `開 ${number(point.open)}　高 ${number(point.high)}　低 ${number(point.low)}　收 ${number(point.close)}` : '滑鼠移到 K 線可查看開高低收';}
+   if(pinned.time)return;
+   const point=param.seriesData?.get(model.candleSeries);
+   showCandleInfo(param.time,point);
  });
+ model.chart.subscribeClick(param=>{
+   const point=param.seriesData?.get(model.candleSeries);
+   if(!point||!param.time){releasePinned();return;}
+   const key=typeof param.time==='string'?param.time:(param.time.year?`${param.time.year}-${String(param.time.month).padStart(2,'0')}-${String(param.time.day).padStart(2,'0')}`:String(param.time));
+   if(pinned.time===key){releasePinned();return;}
+   pinned.time=key;pinned.close=point.close;
+   if(model.chart.setCrosshairPosition)model.chart.setCrosshairPosition(point.close,param.time,model.candleSeries);
+   showCandleInfo(param.time,point,true);
+   const status=$('candle-lock-status');if(status)status.textContent='已鎖定 '+key+'；再點一次或按 Esc 解除';
+ });
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&pinned.time)releasePinned();});
  if(typeof ResizeObserver!=='undefined'){
     model.chartObserver=new ResizeObserver(()=>resizeChart());model.chartObserver.observe(el);
  }
@@ -285,6 +367,7 @@ function drawChart(){
  if(currentPage!=='terminal')return;
  if(!ensureChart())return;
  const rows=model.lastCandles;
+ pinned.time=null; pinned.close=null; $('candle-detail-tooltip')?.classList.add('hidden');
  model.candleSeries.setData(rows.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close})));
  model.ma5.setData(model.showMA?ma(rows,5):[]);
  model.ma20.setData(model.showMA?ma(rows,20):[]);
@@ -298,7 +381,7 @@ function drawChart(){
 window.renderStockChart=()=>{if(currentPage==='terminal')loadCandles();};
 window.renderWatchlistPage=function(){
  const el=$('watchlist-cards-container');if(!el)return;
- if(!userState?.starredCodes?.length){el.innerHTML=hasVerifiedGoogleLogin()?'<p class="text-slate-400">目前沒有自選股。可在全市場表格點星號加入。</p>':'<div class="p-4 rounded-xl border border-slate-700 text-slate-300">訪客模式：可瀏覽全市場與 K 線；登入 Google 後才能儲存自己的自選股。<button onclick="requestGoogleLoginForSave()" class="ml-2 text-indigo-300 font-bold">登入以儲存 →</button></div>';return;}
+ if(!userState?.starredCodes?.length){el.innerHTML='<p class="text-slate-400">目前沒有自選股。可在全市場表格點星號加入。</p>';return;}
  el.innerHTML=userState.starredCodes.map(c=>{
  const x=model.map.get(c),s=STOCK_DB[c],name=x?.name||s?.name||'資料待同步';
  return `<div class="glass-panel rounded-2xl p-4 flex items-center justify-between gap-2"><div><div class="font-bold text-white">${safeText(c)} ${safeText(name)}</div>
@@ -330,5 +413,6 @@ window.onload=async function(){
  model.marketStatus='正在載入 TWSE／TPEx 股票名單…';
  renderEnhancedTable();
  await loadUniverse();
+ startQuotePolling();
 };
 })();
