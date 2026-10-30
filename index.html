@@ -173,7 +173,7 @@
                             </span>
                         </div>
                         <p class="text-[11px] text-slate-400">
-                            <span id="header-today-date">載入日期中...</span> • 串接真實法人買賣超與外資持股 • 全市場 AI 動態日報自動更新
+                            <span id="header-today-date">載入日期中...</span> • 串接真實法人買賣超與外資持股 • 行情依資料來源公告時間更新
                         </p>
                     </div>
                 </div>
@@ -281,7 +281,7 @@
         </div>
     </div>
 
-    <div class="max-w-7xl mx-auto w-full px-4 py-1 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-sky-400"></i><span id="quote-sync-status" class="text-xs text-slate-400">行情：正在確認交易時段及來源；盤後與盤中參考資料會分開標示</span></div>
+    <div class="max-w-7xl mx-auto w-full px-4 py-1 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-sky-400"></i><span id="quote-sync-status" class="text-xs text-slate-400">正在取得行情：盤中參考／盤後收盤會標示實際交易時間</span></div>
     <!-- 主內容容器 -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
 
@@ -306,7 +306,7 @@
                             </span>
                         </div>
                         <p class="text-xs text-slate-300 leading-relaxed">
-                            系統會在每天開盤或您點擊更新時，<strong>自動抓取 FinMind 全市場真實數據</strong>，並由 Gemini AI 綜合分析台積電、聯發科、台達電、鴻海與大盤脈動。
+                            系統會取得 TWSE／TPEx 最近可用的盤後資料及盤中參考行情，並由 Gemini AI 綜合分析台積電、聯發科、台達電、鴻海與大盤脈動。
                         </p>
                     </div>
 
@@ -314,7 +314,7 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <button onclick="syncAllRealFinMindData(true)" id="btn-sync-finmind" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-emerald-300 transition flex items-center gap-1.5">
                             <i class="fa-solid fa-database" id="icon-sync-finmind"></i>
-                            <span>1. 同步 FinMind 全市場真實數據</span>
+                            <span>1. 同步 TWSE／TPEx 官方行情</span>
                         </button>
 
                         <button onclick="generateDailyAiReport()" id="btn-generate-ai-report" class="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-xs sm:text-sm font-black text-white shadow-lg shadow-indigo-500/30 transition flex items-center gap-2">
@@ -359,15 +359,15 @@
                 <div id="card-taiex" class="glass-panel rounded-2xl p-4 border-l-4 border-l-emerald-500">
                     <div class="flex items-center justify-between mb-1">
                         <span class="text-xs font-semibold text-slate-400">台灣加權指數 (TAIEX)</span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">回測半年線支撐</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"><span id="taiex-date">官方資料未同步</span></span>
                     </div>
                     <div class="flex items-baseline gap-2 my-1">
-                        <span id="taiex-price" class="num-mono text-2xl sm:text-3xl font-extrabold text-emerald-400">44,911.25</span>
-                        <span id="taiex-change" class="num-mono text-sm font-bold text-emerald-400">▼ 1,392.40 (-3.01%)</span>
+                        <span id="taiex-price" class="num-mono text-2xl sm:text-3xl font-extrabold text-emerald-400">—</span>
+                        <span id="taiex-change" class="num-mono text-sm font-bold text-emerald-400">—</span>
                     </div>
                     <div class="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-slate-800/80 text-[11px] text-slate-400">
-                        <div>預估量：<span id="taiex-vol" class="num-mono text-slate-200 font-semibold">6,842 億</span></div>
-                        <div>半年線：<span class="num-mono text-amber-400 font-semibold">45,280 點</span></div>
+                        <div>成交金額：<span id="taiex-vol" class="num-mono text-slate-200 font-semibold">—</span></div>
+                        <div>半年線：<span id="taiex-ma120" class="num-mono text-amber-400 font-semibold">—</span></div>
                     </div>
                 </div>
 
@@ -375,25 +375,25 @@
                 <div class="glass-panel rounded-2xl p-4 border-l-4 border-l-indigo-500">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-xs font-semibold text-slate-400">全市場三大法人買賣超</span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300">外資調節 / 投信護盤</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300">法人資料待同步</span>
                     </div>
                     <div class="space-y-1.5 text-xs">
                         <div class="flex justify-between items-center">
                             <span class="text-slate-400">外資及陸資</span>
-                            <span class="num-mono font-bold text-emerald-400">-688.15 億</span>
+                            <span class="num-mono font-bold text-emerald-400">—</span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-slate-400">投信基金 (連買護盤)</span>
-                            <span class="num-mono font-bold text-red-400">+78.42 億</span>
+                            <span class="text-slate-400">投信基金</span>
+                            <span class="num-mono font-bold text-red-400">—</span>
                         </div>
                         <div class="flex justify-between items-center">
                             <span class="text-slate-400">自營商 (含避險)</span>
-                            <span class="num-mono font-bold text-emerald-400">-222.98 億</span>
+                            <span class="num-mono font-bold text-emerald-400">—</span>
                         </div>
                     </div>
                     <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex justify-between text-[11px]">
-                        <span class="text-slate-400">全市場外資市值佔比：</span>
-                        <span class="num-mono font-bold text-cyan-400">41.85%</span>
+                        <span class="text-slate-400">全市場外資市值佔比（未同步）：</span>
+                        <span class="num-mono font-bold text-cyan-400">—</span>
                     </div>
                 </div>
 
@@ -404,7 +404,7 @@
                             <div class="flex items-center gap-1.5 overflow-hidden">
                                 <span class="text-xs font-bold text-amber-400 whitespace-nowrap">2308 台達電</span>
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 whitespace-nowrap">
-                                    外資 <span id="card-2308-fpct">64.82%</span>
+                                    外資 <span id="card-2308-fpct">—</span>
                                 </span>
                             </div>
                             <button onclick="toggleStar('2308', event)" class="text-sm hover:scale-110 transition shrink-0">
@@ -412,14 +412,15 @@
                             </button>
                         </div>
                         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 my-1">
-                            <span id="card-2308-price" class="num-mono text-2xl font-extrabold text-emerald-400">1,335.00</span>
-                            <span id="card-2308-change" class="num-mono text-xs font-bold text-emerald-400">▼ 145.00</span>
-                            <span id="card-2308-pct" class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500 text-slate-950">-9.80%</span>
+                            <span id="card-2308-price" class="num-mono text-2xl font-extrabold text-emerald-400">—</span>
+                            <span id="card-2308-change" class="num-mono text-xs font-bold text-emerald-400">—</span>
+                            <span id="card-2308-pct" class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500 text-slate-950">—</span>
                         </div>
+                        <div id="card-2308-asof" class="text-[10px] text-slate-500 mt-1">等待官方行情</div>
                     </div>
                     <div class="grid grid-cols-2 gap-1 mt-3 pt-2.5 border-t border-slate-800/80 text-[11px] text-slate-400">
-                        <div>法人：<span id="card-2308-inst" class="num-mono text-slate-200 font-semibold truncate block">外資-5,420 投信+380</span></div>
-                        <div>27E P/E：<span class="num-mono text-amber-300 font-semibold">約 28.7 倍</span></div>
+                        <div>法人：<span id="card-2308-inst" class="num-mono text-slate-200 font-semibold truncate block">—</span></div>
+                        <div>官方本益比：<span id="card-2308-pe" class="num-mono text-amber-300 font-semibold">—</span></div>
                     </div>
                 </div>
 
@@ -430,7 +431,7 @@
                             <div class="flex items-center gap-1.5 overflow-hidden">
                                 <span class="text-xs font-bold text-blue-400 whitespace-nowrap">2330 台積電</span>
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 whitespace-nowrap">
-                                    外資 <span id="card-2330-fpct">73.24%</span>
+                                    外資 <span id="card-2330-fpct">—</span>
                                 </span>
                             </div>
                             <button onclick="toggleStar('2330', event)" class="text-sm hover:scale-110 transition shrink-0">
@@ -438,14 +439,15 @@
                             </button>
                         </div>
                         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 my-1">
-                            <span id="card-2330-price" class="num-mono text-2xl font-extrabold text-emerald-400">2,375.00</span>
-                            <span id="card-2330-change" class="num-mono text-xs font-bold text-emerald-400">▼ 45.00</span>
-                            <span id="card-2330-pct" class="num-mono text-[11px] font-semibold text-emerald-400">(-1.86%)</span>
+                            <span id="card-2330-price" class="num-mono text-2xl font-extrabold text-emerald-400">—</span>
+                            <span id="card-2330-change" class="num-mono text-xs font-bold text-emerald-400">—</span>
+                            <span id="card-2330-pct" class="num-mono text-[11px] font-semibold text-emerald-400">—</span>
                         </div>
+                        <div id="card-2330-asof" class="text-[10px] text-slate-500 mt-1">等待官方行情</div>
                     </div>
                     <div class="grid grid-cols-2 gap-1 mt-3 pt-2.5 border-t border-slate-800/80 text-[11px] text-slate-400">
-                        <div>大戶比：<span class="num-mono text-slate-200 font-semibold">86.5% 鎖碼</span></div>
-                        <div>27E P/E：<span class="num-mono text-indigo-300 font-semibold">約 19.5 倍</span></div>
+                        <div>大戶比：<span class="num-mono text-slate-200 font-semibold">—</span></div>
+                        <div>官方本益比：<span id="card-2330-pe" class="num-mono text-indigo-300 font-semibold">—</span></div>
                     </div>
                 </div>
             </section>
@@ -493,24 +495,24 @@
 
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                             <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
-                                <div class="text-[11px] text-slate-400">台積電 (2330) 外資比</div>
-                                <div class="num-mono text-sm sm:text-base font-bold text-cyan-400 mt-0.5">73.24%</div>
-                                <div class="text-[10px] text-slate-400">先進製程壟斷</div>
+                                <div class="text-[11px] text-slate-400">台積電 (2330) 最新可得價</div>
+                                <div class="num-mono text-sm sm:text-base font-bold text-cyan-400 mt-0.5" id="spotlight-2330-price">—</div>
+                                <div class="text-[10px] text-slate-400">官方盤後／盤中參考</div>
                             </div>
                             <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
-                                <div class="text-[11px] text-slate-400">聯發科 (2454) 投信比</div>
-                                <div class="num-mono text-sm sm:text-base font-bold text-red-400 mt-0.5">投信連 5 買</div>
-                                <div class="text-[10px] text-slate-400">ASIC 成長引擎</div>
+                                <div class="text-[11px] text-slate-400">聯發科 (2454) 最新可得價</div>
+                                <div class="num-mono text-sm sm:text-base font-bold text-red-400 mt-0.5" id="spotlight-2454-price">—</div>
+                                <div class="text-[10px] text-slate-400">官方盤後／盤中參考</div>
                             </div>
                             <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
-                                <div class="text-[11px] text-slate-400">台達電 (2308) 狀態</div>
-                                <div class="num-mono text-sm sm:text-base font-bold text-amber-400 mt-0.5">跌停回測 1335</div>
-                                <div class="text-[10px] text-slate-400">存貨跌價將回沖</div>
+                                <div class="text-[11px] text-slate-400">台達電 (2308) 最新可得價</div>
+                                <div class="num-mono text-sm sm:text-base font-bold text-amber-400 mt-0.5" id="spotlight-2308-price">—</div>
+                                <div class="text-[10px] text-slate-400">官方盤後／盤中參考</div>
                             </div>
                             <div class="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
-                                <div class="text-[11px] text-slate-400">鴻海 (2317) 投信連買</div>
-                                <div class="num-mono text-sm sm:text-base font-bold text-emerald-400 mt-0.5">連 10 日護盤</div>
-                                <div class="text-[10px] text-slate-400">本益比僅 13.9x</div>
+                                <div class="text-[11px] text-slate-400">鴻海 (2317) 最新可得價</div>
+                                <div class="num-mono text-sm sm:text-base font-bold text-emerald-400 mt-0.5" id="spotlight-2317-price">—</div>
+                                <div class="text-[10px] text-slate-400">官方盤後／盤中參考</div>
                             </div>
                         </div>
 
@@ -521,7 +523,7 @@
                     <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
                         <div class="text-xs text-indigo-300 font-medium flex items-center gap-1.5">
                             <i class="fa-solid fa-lightbulb"></i>
-                            <span>AI 結論：全市場 AI 供應鏈長線邏輯未變，透過三階段分批低接鎖定中長線價差</span>
+                            <span>AI 報告僅供研究參考，未生成最新報告前不提供市場買賣建議</span>
                         </div>
                         <button onclick="switchPage('strategy')" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition">
                             進入三階段建倉試算 →
@@ -531,7 +533,7 @@
             </section>
 
             <!-- 來源註記：僅全市場股票表格與 K 線來自官方動態資料；上方示範總覽不保證即時 -->
-            <div class="rounded-xl px-4 py-3 border border-amber-500/30 bg-amber-500/10 text-xs text-amber-200">資料區分：下方「全台股市場資料」與個股 K 線會向官方資料源查詢；上方宏觀總覽、歷史範本及估值觀點可能仍為舊示範內容，不應視為當日即時行情或投資建議。</div>
+            <div class="rounded-xl px-4 py-3 border border-amber-500/30 bg-amber-500/10 text-xs text-amber-200">資料區分：首頁加權指數、官方本益比及個股股價由資料服務更新，逐筆即時行情未授權前不保證同步；法人與籌碼無可驗證來源時顯示「—」。其他估值試算與舊 AI 歷史報告非即時行情，不應視為投資建議。</div>
             <!-- 第三排：全市場外資持股佔比與三大法人即時籌碼總表 -->
             <section class="glass-panel rounded-2xl p-5 space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
@@ -573,7 +575,7 @@
                                 <th class="py-2.5 px-3 text-right">外資買賣超</th>
                                 <th class="py-2.5 px-3 text-right">投信買賣超</th>
                                 <th class="py-2.5 px-3 text-right">資料來源</th>
-                                <th class="py-2.5 px-3 text-right">預估本益比</th>
+                                <th class="py-2.5 px-3 text-right">本益比（未同步顯示 —）</th>
                                 <th class="py-2.5 px-3 text-center">操作</th>
                             </tr>
                         </thead>
@@ -642,16 +644,14 @@
 
                             <div class="text-right">
                                 <div class="flex items-baseline justify-end gap-2">
-                                    <span id="detail-price" class="num-mono text-3xl sm:text-4xl font-black text-emerald-400">1,335.00</span>
+                                    <span id="detail-price" class="num-mono text-3xl sm:text-4xl font-black text-emerald-400">—</span>
                                     <span class="text-xs text-slate-400">TWD</span>
                                 </div>
                                 <div class="flex items-center justify-end gap-2 mt-1">
                                     <span class="px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-bold num-mono">
                                         外資持股 <span id="header-foreign-pct">64.82%</span>
                                     </span>
-                                    <span id="detail-change" class="num-mono text-sm font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
-                                        ▼ 145.00 (-9.80%)
-                                    </span>
+                                    <span id="detail-change" class="num-mono text-sm font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">—</span>
                                 </div>
                             </div>
                         </div>
@@ -694,6 +694,7 @@
                             </div>
                             <div id="candle-detail-tooltip" class="hidden rounded-lg border border-indigo-500/40 bg-indigo-950/50 text-indigo-100 px-3 py-2 font-mono text-[11px] leading-relaxed" aria-live="polite"></div>
                             <div id="candle-lock-status" class="text-cyan-300 text-[11px]">移動滑鼠定位；單擊固定 K 棒；按 Esc 解除</div>
+                            <div id="candle-live-quote" class="text-[11px] text-cyan-300">最新可得股價尚未同步</div>
                             <div id="stockKChart" style="width:100%;height:430px" role="img" aria-label="真實歷史開盤、最高、最低、收盤 K 線圖"></div>
                             <div class="flex flex-col sm:flex-row justify-between gap-2 text-xs">
                                 <span id="candle-status" class="text-slate-400">等待載入官方歷史 K 線…</span>
@@ -705,46 +706,46 @@
                         <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-2 border-t border-slate-800 text-xs">
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">昨收價</span>
-                                <span id="detail-prev" class="num-mono font-bold text-slate-200">1,480.00</span>
+                                <span id="detail-prev" class="num-mono font-bold text-slate-200">—</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">開盤價</span>
-                                <span id="detail-open" class="num-mono font-bold text-emerald-400">1,360.00</span>
+                                <span id="detail-open" class="num-mono font-bold text-emerald-400">—</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">最高 / 最低</span>
-                                <span id="detail-hl" class="num-mono font-bold text-slate-200">1,365 / 1,335</span>
+                                <span id="detail-hl" class="num-mono font-bold text-slate-200">—</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">成交量 (張)</span>
-                                <span id="detail-vol" class="num-mono font-bold text-indigo-300">28,450</span>
+                                <span id="detail-vol" class="num-mono font-bold text-indigo-300">—</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg border border-cyan-500/25">
                                 <span class="text-cyan-300 block text-[10px]">外資持股比</span>
-                                <span id="detail-foreign-pct" class="num-mono font-bold text-cyan-400">64.82%</span>
+                                <span id="detail-foreign-pct" class="num-mono font-bold text-cyan-400">—</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">外資買賣超</span>
-                                <span id="detail-foreign-net" class="num-mono font-bold text-emerald-400">-5,420 張</span>
+                                <span id="detail-foreign-net" class="num-mono font-bold text-emerald-400">—</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">投信買賣超</span>
-                                <span id="detail-trust-net" class="num-mono font-bold text-red-400">+380 張</span>
+                                <span id="detail-trust-net" class="num-mono font-bold text-red-400">—</span>
                             </div>
                             <div class="bg-slate-900/70 p-2 rounded-lg">
                                 <span class="text-slate-400 block text-[10px]">400張大戶比</span>
-                                <span id="detail-whale-pct" class="num-mono font-bold text-amber-300">78.40%</span>
+                                <span id="detail-whale-pct" class="num-mono font-bold text-amber-300">—</span>
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
                             <div class="bg-slate-900/70 p-2.5 rounded-lg flex items-center justify-between">
-                                <span class="text-slate-400">2027E 預估本益比 (P/E)：</span>
-                                <span id="detail-pe" class="num-mono font-bold text-amber-400">28.7 倍</span>
+                                <span class="text-slate-400">官方公告本益比 (P/E)：</span>
+                                <span id="detail-pe" class="num-mono font-bold text-amber-400">—</span>
                             </div>
                             <div class="bg-slate-900/70 p-2.5 rounded-lg flex items-center justify-between">
                                 <span class="text-slate-400">長線關鍵支撐位：</span>
-                                <span id="detail-support" class="num-mono font-bold text-emerald-300">1,280 / 1,180 元</span>
+                                <span id="detail-support" class="num-mono font-bold text-emerald-300">—</span>
                             </div>
                         </div>
                     </div>
@@ -1448,43 +1449,24 @@
         let countdownSeconds = 30;
         let autoRefreshEnabled = true;
         let timerInterval = null;
-        let taiexState = { price: 44911.25, prevClose: 46303.65, volumeBillion: 6842 };
+        // TAIEX prices are read from /api/summary; no demo index is stored.
 
-        // 全市場宏觀與多檔焦點股 AI 每日自動日報預設範本
+        // Unverified demo analysis must never masquerade as today's AI-generated report.
         const DEFAULT_MARKET_AI_REPORT = {
-            date: '2026-10-30',
-            generatedAt: '2026-10-30 12:30 (每日自動更新)',
-            marketTitle: '全市場台股重挫千點與 AI 供應鏈脈動解析',
-            strategyFooter: '操作策略：融資積極清洗，外資高持股權值股採左側分批低接',
+            date: '—', generatedAt: '尚未產生 AI 報告（無官方資料推論）',
+            marketTitle: '尚未產生今日 AI 分析報告',
+            strategyFooter: '僅以官方已公告行情及提供的資料進行分析；未核實的籌碼數據不得推測。',
             drivers: [
-                {
-                    title: '美股財報影響與 AI 資本支出疑慮',
-                    color: 'red',
-                    detail: 'Alphabet 財報現金流轉負但維持高資本支出引發疑慮，重創美股科技股，連帶壓抑台系 AI 硬體（台積電、台達電、鴻海）短線籌碼。'
-                },
-                {
-                    title: '總經與匯率：外資調節與新台幣走勢',
-                    color: 'amber',
-                    detail: '美國通膨數據擔憂使外資單日大舉提款台股，新台幣貶破 32.6 元關卡，權值股面臨被動型基金調節壓力。'
-                },
-                {
-                    title: '內資與投信逆勢護盤核心權值',
-                    color: 'emerald',
-                    detail: '投信基金與官股行庫在指數回測半年線時持續買超護盤，鎖碼台積電、鴻海、聯發科與 AI 散熱指標。'
-                }
+                { title: '市場行情', color: 'red', detail: '請先同步官方資料；未成功呼叫 Gemini 前，不顯示假設的市場結論。' },
+                { title: '法人與籌碼', color: 'amber', detail: '尚未取得可驗證的法人交易明細，暫不提供買賣超推論。' },
+                { title: 'AI 分析', color: 'emerald', detail: '登入授權後可使用 AI 日報功能。請注意模型配額與資料日期。' }
             ],
-            spotlightBadge: '全市場焦點 • 每日自動整理',
-            spotlightTitle: '台積電、聯發科、台達電、鴻海最新籌碼與買點診斷',
-            spotlightLeftTitle: '台積電 (2330) 與聯發科 (2454) 籌碼掃描',
-            spotlightLeftPoints: [
-                '<strong>台積電：</strong>外資持股維持 73.2% 高檔，先進製程與 CoWoS 產能吃緊，2027E 本益比約 19.5 倍具極高長線安全邊際。',
-                '<strong>聯發科：</strong>投信連 5 日逆勢買超，天璣旗艦晶片與 CSP 雲端 ASIC 專案放量，拉回皆為優質長線佈局點。'
-            ],
-            spotlightRightTitle: '台達電 (2308) 與鴻海 (2317) 估值評估',
-            spotlightRightPoints: [
-                '<strong>台達電：</strong>Q3 雖因存貨跌價損失短線跌停，但訂單未失，後續缺料緩解將有迴轉利益回沖毛利。',
-                '<strong>鴻海：</strong>本益比僅 13.9 倍，投信連 10 日強勢買超護盤，AI 伺服器機櫃出貨比重突破 45%。'
-            ],
+            spotlightBadge: '尚未生成 AI 日報',
+            spotlightTitle: '四檔焦點股的價格由官方行情同步；分析內容須另外生成',
+            spotlightLeftTitle: '台積電 (2330) 與聯發科 (2454)',
+            spotlightLeftPoints: ['行情請以上方資料來源與交易日期為準。'],
+            spotlightRightTitle: '台達電 (2308) 與鴻海 (2317)',
+            spotlightRightPoints: ['無可靠資料時不提供估值或買賣建議。'],
             sources: []
         };
 
