@@ -3,9 +3,9 @@ Data: TWSE & TPEx public market snapshots; FinMind optional OHLC, TWSE historic 
 Never manufactures prices. This is NOT a trading or real-time quotation service.
 """
 from __future__ import annotations
-import json, os, re, sys, time, threading, traceback, secrets
+import json, os, re, sys, time, threading, traceback, socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit
@@ -15,13 +15,13 @@ from urllib.error import HTTPError, URLError
 BASE = Path(__file__).resolve().parent
 HOST = os.environ.get('HOST', '0.0.0.0' if os.environ.get('PORT') else '127.0.0.1')
 PORT = int(os.environ.get('PORT', os.environ.get('TWSE_PORT', '8000')))
-ALLOWED_ORIGINS = {s.strip().rstrip('/') for s in os.environ.get('ALLOWED_ORIGINS', 'https://seanlee0804.github.io,http://localhost:8000,http://127.0.0.1:8000').split(',') if s.strip()}
+ALLOWED_ORIGINS = {v.strip() for v in os.environ.get('ALLOWED_ORIGINS', 'https://seanlee0804.github.io,http://localhost:8000,http://127.0.0.1:8000').split(',') if v.strip()}
 FINMIND_TOKEN = os.environ.get('FINMIND_TOKEN', '').strip()
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
-AI_ALLOWED_EMAILS = {e.strip().lower() for e in os.environ.get('AI_ALLOWED_EMAILS', '034sean0804@gmail.com').split(',') if e.strip()}
-AI_LAST_CALL = {}
+AI_ALLOWED_EMAILS = {v.strip().lower() for v in os.environ.get('AI_ALLOWED_EMAILS', '').split(',') if v.strip()}
 AI_LOCK = threading.Lock()
+AI_LAST_CALL = {}
 CACHE = {}
 LOCK = threading.Lock()
 MAX_BYTES = 30_000_000
@@ -227,7 +227,7 @@ def candles(code, window, token=''):
     spans = {'5D': 12, '1M': 40, '3M': 108, '6M': 205, '1Y': 390}
     if window not in spans: raise DataError('不支援的時間範圍', 400)
     days = spans[window]
-    key = ('candles',code,window, bool(token or FINMIND_TOKEN))
+    key = ('candles',code,window, bool(token))
     def loader():
         issues = []
         result = []
@@ -255,54 +255,127 @@ def candles(code, window, token=''):
                 'asOf':ordered[-1]['time'] if ordered else None}
     return cached(key, 1800, loader)
 
+
+TAIPEI_TZ = timezone(timedelta(hours=8))
+
+def market_clock():
+    now = datetime.now(TAIPEI_TZ)
+    mins = now.hour * 60 + now.minute
+    return now, now.weekday() < 5 and 540 <= mins <= 810
+
+def intraday_quotes(codes):
+    # This endpoint provides a best-effort MIS reference. It is NOT licensed tick-by-tick data.
+    codes = list(dict.fromkeys(codes))
+    if not 1 <= len(codes) <= 12 or not all(symbol_ok(c) for c in codes):
+        raise DataError('僅支援每次 1～12 檔有效股票代號', 400)
+    now, is_session = market_clock()
+    base = {'quotes': [], 'requested': codes, 'checkedAt': now.isoformat(),
+            'status': 'market_closed' if not is_session else 'unavailable',
+            'source': 'TWSE MIS 盤中參考（非保證即時）', 'pollIntervalSeconds': 15}
+    if not is_session:
+        return {**base, 'message': '非平日一般交易時段，使用官方盤後資料'}
+
+    def loader():
+        try:
+            lookup = {x['code']: x for x in universe()['stocks']}
+            channels = [('otc_' if lookup[c]['market'] == '上櫃' else 'tse_') + c + '.tw'
+                        for c in codes if c in lookup]
+            if not channels:
+                return {**base, 'message': '沒有符合條件的股票'}
+            url = 'https://mis.twse.com.tw/stock/api/getStockInfo.jsp?' + urlencode({
+                'ex_ch': '|'.join(channels), 'json': '1', 'delay': '0'})
+            payload = fetch_json(url, timeout=10)
+            result = []
+            for raw in (payload.get('msgArray') or []):
+                code = str(raw.get('c') or '')
+                if code not in codes:
+                    continue
+                try:
+                    dt = datetime.strptime(str(raw.get('d')) + ' ' + str(raw.get('t')),
+                                           '%Y%m%d %H:%M:%S').replace(tzinfo=TAIPEI_TZ)
+                except (ValueError, TypeError):
+                    continue
+                age = (now - dt).total_seconds()
+                value, prev = num(raw.get('z')), num(raw.get('y'))
+                if value is None or value <= 0 or age < -10 or age > 120:
+                    continue
+                result.append({'code': code, 'price': value, 'prevClose': prev,
+                               'change': value-prev if prev and prev > 0 else None,
+                               'open': num(raw.get('o')), 'high': num(raw.get('h')),
+                               'low': num(raw.get('l')), 'asOf': dt.isoformat(),
+                               'date': dt.date().isoformat(), 'source': 'TWSE MIS 盤中參考',
+                               'quality': 'intraday_reference', 'ageSeconds': round(age)})
+            return {**base, 'quotes': result, 'status': 'intraday_reference' if result else 'unavailable',
+                    'message': '盤中參考行情' if result else '無足夠新的成交資料，保留官方盤後價格'}
+        except (DataError, OSError, KeyError, ValueError):
+            return {**base, 'message': '盤中來源暫不可用，保留官方盤後資料'}
+    return cached(('intraday', tuple(codes)), 12, loader)
+
 def verify_google_id_token(token):
     if not GOOGLE_CLIENT_ID:
-        raise DataError('後端尚未設定 GOOGLE_CLIENT_ID', 503)
+        raise DataError('伺服器未設定 GOOGLE_CLIENT_ID', 503)
     if not token or len(token) > 8192:
-        raise DataError('未提供 Google 登入憑證', 401)
-    # Google's public tokeninfo is acceptable for low-volume dev; production should
-    # validate JWT signatures with Google's official verification libraries.
-    info = fetch_json('https://oauth2.googleapis.com/tokeninfo?' + urlencode({'id_token':token}), timeout=12)
-    if (info.get('aud') != GOOGLE_CLIENT_ID or str(info.get('email_verified')).lower() != 'true' or info.get('iss') not in ('accounts.google.com','https://accounts.google.com')):
-        raise DataError('Google 登入驗證失敗', 401)
-    if int(info.get('exp') or 0) <= time.time():
-        raise DataError('Google 登入已過期，請重新登入', 401)
+        raise DataError('請先使用 Google 帳號登入', 401)
+    # For low-volume deployments, validate with Google's tokeninfo endpoint.
+    # Production should verify signatures locally using Google's official libraries.
+    try:
+        info = fetch_json('https://oauth2.googleapis.com/tokeninfo?' + urlencode({'id_token': token}), timeout=10)
+    except DataError:
+        raise DataError('Google 身分驗證失敗或逾時，請重新登入', 401)
+    if (info.get('aud') != GOOGLE_CLIENT_ID or
+        str(info.get('email_verified')).lower() != 'true' or
+        info.get('iss') not in ('accounts.google.com','https://accounts.google.com') or
+        int(info.get('exp',0)) <= time.time()):
+        raise DataError('Google 憑證無效或已過期', 401)
     return info
-
 
 def ask_gemini_json(prompt, system_prompt):
     if not GEMINI_API_KEY:
-        raise DataError('後端未設定 GEMINI_API_KEY',503)
-    model = os.environ.get('GEMINI_MODEL','gemini-2.5-flash')
-    if not re.fullmatch(r'gemini-[a-z0-9.\-]+',model):
-        raise DataError('GEMINI_MODEL 格式無效',500)
-    url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
+        raise DataError('伺服器未設定 GEMINI_API_KEY', 503)
+    model = os.environ.get('GEMINI_MODEL','gemini-3.8-flash').strip()
+    if not re.fullmatch(r'gemini-[a-z0-9.\-]+', model):
+        raise DataError('GEMINI_MODEL 格式錯誤', 500)
     body = json.dumps({'contents':[{'role':'user','parts':[{'text':prompt}]}],
-        'systemInstruction':{'parts':[{'text':system_prompt}]},
-        'generationConfig':{'temperature':0.35,'responseMimeType':'application/json'}},ensure_ascii=False).encode('utf-8')
-    request=Request(url, data=body, headers={'Content-Type':'application/json','x-goog-api-key':GEMINI_API_KEY},method='POST')
-    try:
-        with urlopen(request,timeout=42) as response:
-            data=json.loads(response.read(2_000_000).decode('utf-8'))
-    except HTTPError as exc:
-        # Never echo request headers or API keys to callers.
-        details=exc.read(8192).decode('utf-8','replace')
-        try: message=json.loads(details).get('error',{}).get('message','Google API 拒絕請求')
-        except Exception: message='Google API 拒絕請求'
-        raise DataError(f'Gemini HTTP {exc.code}: {message[:220]}',502 if exc.code != 429 else 429)
-    except (URLError,TimeoutError) as exc:
-        raise DataError('Gemini API 連線逾時',503)
-    parts=data.get('candidates',[{}])[0].get('content',{}).get('parts',[])
-    raw='\n'.join(str(part.get('text') or '') for part in parts)
-    if not raw: raise DataError('Gemini 沒有產生結果',502)
-    cleaned=re.sub(r'^```(?:json)?\s*|\s*```$','',raw.strip(),flags=re.I)
-    try:
-        result=json.loads(cleaned)
-    except ValueError:
-        raise DataError('Gemini 回傳格式不是有效 JSON',502)
-    if not isinstance(result,dict): raise DataError('Gemini 結果不是 JSON 物件',502)
-    return result
-
+                       'systemInstruction':{'parts':[{'text':system_prompt}]},
+                       'generationConfig':{'temperature':0.25,'responseMimeType':'application/json'}},
+                      ensure_ascii=False).encode('utf-8')
+    last_error = None
+    for attempt in range(2):
+        url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
+        request = Request(url, data=body, method='POST', headers={
+            'Content-Type':'application/json','x-goog-api-key':GEMINI_API_KEY})
+        try:
+            with urlopen(request, timeout=(48 if attempt == 0 else 30)) as response:
+                data = json.loads(response.read(2_000_000).decode('utf-8'))
+            candidates = data.get('candidates', [])
+            parts = candidates[0].get('content',{}).get('parts',[]) if candidates else []
+            content = '\n'.join(str(x.get('text','')) for x in parts).strip()
+            if not content:
+                raise DataError('AI 未回傳內容，請縮小分析範圍', 502)
+            content = re.sub(r'^```(?:json)?\s*|\s*```$', '', content, flags=re.I).strip()
+            result = json.loads(content)
+            if not isinstance(result, dict):
+                raise DataError('AI 回傳格式不是 JSON 物件',502)
+            return result
+        except HTTPError as e:
+            try:
+                detail = json.loads(e.read(4096).decode('utf-8','replace')).get('error',{}).get('message','API 拒絕請求')
+            except (ValueError, KeyError, AttributeError):
+                detail = 'API 拒絕請求'
+            last_error = DataError(f'Gemini HTTP {e.code}：{str(detail)[:170]}', 429 if e.code==429 else 502)
+            if e.code in (429,500,502,503,504) and attempt==0:
+                time.sleep(1.5)
+                continue
+            raise last_error
+        except (TimeoutError, URLError, socket.timeout, OSError):
+            last_error = DataError('Gemini API 連線逾時，請重試或選用回應較快的模型', 504)
+            if attempt == 0:
+                time.sleep(1)
+                continue
+            raise last_error
+        except (ValueError, UnicodeError):
+            raise DataError('Gemini 回傳不是有效 JSON，請重試',502)
+    raise last_error or DataError('Gemini 生成失敗', 502)
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
@@ -313,16 +386,16 @@ class Handler(SimpleHTTPRequestHandler):
         print('%s - %s' % (self.address_string(), (format % args).split('?')[0]), flush=True)
 
     def _cors(self):
-        origin = self.headers.get('Origin', '').rstrip('/')
+        origin = self.headers.get('Origin','').rstrip('/')
         if origin in ALLOWED_ORIGINS:
             self.send_header('Access-Control-Allow-Origin', origin)
-            self.send_header('Vary','Origin')
-            self.send_header('Access-Control-Allow-Methods','GET, POST, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers','Content-Type, Authorization')
+            self.send_header('Vary', 'Origin')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
     def do_OPTIONS(self):
-        origin = self.headers.get('Origin', '').rstrip('/')
-        self.send_response(204 if origin in ALLOWED_ORIGINS else 403)
+        allowed = self.headers.get('Origin','').rstrip('/') in ALLOWED_ORIGINS
+        self.send_response(204 if allowed else 403)
         self._cors()
         self.send_header('Content-Length','0')
         self.end_headers()
@@ -340,6 +413,11 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlsplit(self.path)
+        if parsed.path == '/api/quotes':
+            args = parse_qs(parsed.query)
+            codes = [c.strip() for c in (args.get('codes') or [''])[0].split(',') if c.strip()]
+            try: return self.json_reply(200, intraday_quotes(codes))
+            except DataError as e: return self.json_reply(e.status, {'error':str(e)})
         if parsed.path == '/api/health':
             return self.json_reply(200, {'ok':True, 'backend':'TWSE Pro', 'time':datetime.now().isoformat(timespec='seconds')})
         if parsed.path == '/api/stocks':
@@ -361,25 +439,26 @@ class Handler(SimpleHTTPRequestHandler):
         parsed = urlsplit(self.path)
         if parsed.path == '/api/ai/generate':
             try:
-                length = int(self.headers.get('Content-Length','0'))
-                if length < 2 or length > 16000: return self.json_reply(400, {'error':'AI 文字內容長度不正確'})
-                cred = self.headers.get('Authorization','')
-                if not cred.startswith('Bearer '): return self.json_reply(401, {'error':'請先使用 Google 帳號登入'})
-                identity=verify_google_id_token(cred[7:].strip())
-                email=str(identity.get('email','')).lower()
-                if email not in AI_ALLOWED_EMAILS: return self.json_reply(403, {'error':'AI 生成目前僅開放網站管理員；會員可瀏覽行情並儲存自選股'})
+                size = int(self.headers.get('Content-Length','0'))
+                if size < 2 or size > 16000: return self.json_reply(400, {'error':'AI 內容過長或格式錯誤'})
+                credential = self.headers.get('Authorization','')
+                if not credential.startswith('Bearer '): return self.json_reply(401, {'error':'請先使用 Google 登入'})
+                user = verify_google_id_token(credential[7:].strip())
+                email = str(user.get('email','')).lower()
+                if email not in AI_ALLOWED_EMAILS: return self.json_reply(403, {'error':'AI 生成目前僅開放管理員'})
                 with AI_LOCK:
-                    last=AI_LAST_CALL.get(email,0)
-                    if time.time()-last<20: return self.json_reply(429, {'error':'AI 操作太頻繁，請稍後再試'})
-                    AI_LAST_CALL[email]=time.time()
-                data=json.loads(self.rfile.read(length))
-                prompt=data.get('prompt',''); system_prompt=data.get('systemPrompt','')
-                if not isinstance(prompt,str) or not isinstance(system_prompt,str) or not (0<len(prompt)<=11000) or not (0<len(system_prompt)<=4000):
-                    return self.json_reply(400, {'error':'AI 提示詞格式錯誤'})
-                return self.json_reply(200, {'result':ask_gemini_json(prompt,system_prompt)})
-            except DataError as exc:return self.json_reply(exc.status,{'error':str(exc)})
-            except (ValueError,TypeError):return self.json_reply(400,{'error':'JSON 格式錯誤'})
-            except Exception:return self.json_reply(502,{'error':'AI 後端發生錯誤'})
+                    now = time.time()
+                    if now - AI_LAST_CALL.get(email,0) < 20:
+                        return self.json_reply(429, {'error':'AI 請求過於頻繁，請稍候再試'})
+                    AI_LAST_CALL[email] = now
+                payload = json.loads(self.rfile.read(size))
+                prompt, system = payload.get('prompt',''), payload.get('systemPrompt','')
+                if not isinstance(prompt,str) or not isinstance(system,str) or not (0<len(prompt)<=11000) or not (0<len(system)<=4000):
+                    return self.json_reply(400,{'error':'AI 提示文字格式錯誤'})
+                return self.json_reply(200,{'result':ask_gemini_json(prompt,system)})
+            except DataError as e: return self.json_reply(e.status, {'error':str(e)})
+            except (ValueError,TypeError): return self.json_reply(400,{'error':'JSON 格式錯誤'})
+            except Exception: return self.json_reply(502,{'error':'AI 後端發生未預期的錯誤'})
         if parsed.path != '/api/candles':
             return self.json_reply(404, {'error':'未知端點'})
         try:
@@ -388,8 +467,13 @@ class Handler(SimpleHTTPRequestHandler):
             payload = json.loads(self.rfile.read(size))
             code = str(payload.get('code','')).strip()
             window = str(payload.get('range','3M'))
-            # Public endpoint: credentials come from server environment only.
-            obj = candles(code, window)
+            token = ''  # Secret must be read from Render env, never from the public client.
+            if len(token) > 2048: return self.json_reply(400, {'error':'Token 過長'})
+            # Token is never logged or persisted; cache only by presence, so don't cache authenticated results.
+            if token:
+                obj = candles_no_cache(code, window, token)
+            else:
+                obj = candles(code, window)
             return self.json_reply(200, obj)
         except DataError as e: return self.json_reply(e.status, {'error':str(e)})
         except Exception as e: return self.json_reply(502, {'error':str(e)})
@@ -408,7 +492,7 @@ def candles_no_cache(code, window, token):
     return candles(code,window)
 
 if __name__ == '__main__':
-    print(f'\nTWSE Pro 全台股資料伺服器：http://{HOST}:{PORT}/')
+    print(f'\nTWSE Pro 資料服務：http://{HOST}:{PORT}/')
     print('資料來源：TWSE / TPEx 官方公開資料；FinMind 歷史日 K 可選擇使用既有 Token')
     print('停止：Ctrl + C\n')
     ThreadingHTTPServer((HOST,PORT),Handler).serve_forever()
